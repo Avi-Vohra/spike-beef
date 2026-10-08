@@ -5,8 +5,8 @@ with whatever time remains.
 
 ## Tier 1, core game
 [x] sim.js + physics.js + rules.js with tests (no rendering yet)
-[ ] Render court, players, ball with the basic art style; keyboard input
-[ ] Hit, bump, spike mechanics; serve; touches
+[x] Render court, players, ball with the basic art style; keyboard input
+[x] Hit, bump, spike mechanics; serve; touches
 [ ] Sets, match, screens, menu
 [ ] CPU opponent, 3 difficulties; headless sim test
 [ ] Touch controls, landscape lock screen, canvas scaling, mobile hardening
