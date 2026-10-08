@@ -2,6 +2,7 @@ import { createInitialState, step } from './sim.js';
 import { render } from './render.js';
 import { createKeyboardInput } from './input.js';
 import { renderMenu, renderHowToPlay, renderMatchEnd, renderPause, hideOverlay } from './ui.js';
+import { createAi } from './ai.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -26,21 +27,36 @@ const keyboard = createKeyboardInput();
 let appScreen = 'menu'; // 'menu' | 'howToPlay' | 'match' | 'paused'
 let state = null;
 let spin = 0;
+let cpu = null; // non-null when P2 is CPU-controlled
 
 function goMenu() {
   appScreen = 'menu';
-  renderMenu(overlay, { onLocal2P: startLocal2P, onHowToPlay: () => { appScreen = 'howToPlay'; renderHowToPlay(overlay, { onBack: goMenu }); } });
+  cpu = null;
+  renderMenu(overlay, {
+    onLocal2P: startLocal2P,
+    onCpu: startVsCpu,
+    onHowToPlay: () => { appScreen = 'howToPlay'; renderHowToPlay(overlay, { onBack: goMenu }); },
+  });
 }
 
 function startLocal2P() {
+  cpu = null;
+  state = createInitialState(Date.now() & 0xffffffff);
+  appScreen = 'match';
+  hideOverlay(overlay);
+}
+
+function startVsCpu(difficulty) {
+  cpu = createAi(1, difficulty);
   state = createInitialState(Date.now() & 0xffffffff);
   appScreen = 'match';
   hideOverlay(overlay);
 }
 
 function onMatchEnd() {
+  const rematchDifficulty = cpu ? cpu.difficulty : null;
   renderMatchEnd(overlay, state.match, {
-    onRematch: startLocal2P,
+    onRematch: () => (rematchDifficulty ? startVsCpu(rematchDifficulty) : startLocal2P()),
     onMenu: goMenu,
   });
 }
@@ -76,7 +92,7 @@ function frame(now) {
     acc += elapsed;
     while (acc >= DT) {
       const input1 = keyboard.getP1();
-      const input2 = keyboard.getP2();
+      const input2 = cpu ? cpu.getInput(state) : keyboard.getP2();
       const result = step(state, input1, input2);
       state = result.state;
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;

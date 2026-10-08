@@ -85,9 +85,14 @@ export function step(state, inputP1, inputP2) {
     const serverInput = inputs[next.match.server];
     const wantsHit = !!(serverInput & HIT);
     if (wantsHit || next.match.serveTimer >= AUTO_SERVE_SECONDS) {
-      const power = wantsHit ? 520 : 460 + randomFloat(next) * 80;
-      next.ball.vx = dir * power;
-      next.ball.vy = -power * 0.9;
+      // Horizontal and vertical speed are tuned independently: horizontal
+      // stays catchable (below MOVE_SPEED-ish), vertical is fixed high enough
+      // to reliably clear the net regardless of horizontal speed — otherwise
+      // the serve clips the net, bounces back to the server, and the server
+      // racks up touches on their own serve recovery and faults.
+      const vx = dir * (240 + randomFloat(next) * 40);
+      next.ball.vx = vx;
+      next.ball.vy = -500;
       registerTouch(next.match, next.match.server);
       events.push({ type: 'serve', side: next.match.server });
     }

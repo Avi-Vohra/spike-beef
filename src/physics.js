@@ -10,7 +10,7 @@ export const NET_HALF_W = 5;
 export const PLAYER_RADIUS = 26;
 export const BALL_RADIUS = 12;
 export const GRAVITY = 1500;
-export const MOVE_SPEED = 300;
+export const MOVE_SPEED = 380;
 export const JUMP_VY = -620;
 export const BALL_RESTITUTION = 0.72;
 export const DT = 1 / 60;
@@ -122,6 +122,12 @@ export function resolveGround(ball) {
 // Swept circle-circle collision between ball and player over this substep.
 // Returns true and mutates ball velocity if a collision happened.
 export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
+  // A cooldown gates ALL contact, not just HIT presses: without this, a single
+  // physical touch that spans multiple sub-steps (the ball lingering inside
+  // the collision radius for a few frames) would register as several separate
+  // touches and fault whoever is just standing near the ball.
+  if (p.hitCooldown > 0) return false;
+
   const dx = ball.x - p.x;
   const dy = ball.y - p.y;
   const dist = Math.hypot(dx, dy);
@@ -133,22 +139,22 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   ball.x = p.x + nx * minDist;
   ball.y = p.y + ny * minDist;
 
-  const wantsHit = !!(input & HIT) && p.hitCooldown <= 0;
+  const wantsHit = !!(input & HIT);
   const jumping = !p.onGround;
   const nearPeak = jumping && Math.abs(p.vy) < 260;
 
   let power, steep;
   if (wantsHit && jumping && nearPeak) {
-    power = 920;
+    power = 620;
     steep = 0.55; // spike: fast and steep downward
     events.push('spike');
   } else if (wantsHit) {
-    power = 560;
-    steep = 1.3; // bump: higher, softer
+    power = 420;
+    steep = 1.9; // bump: enough arc to clear the net even hit from close range
     events.push('hit');
   } else {
-    power = 420;
-    steep = 1.1;
+    power = 340;
+    steep = 1.6;
   }
 
   const dirX = p.side === 0 ? 1 : -1;
@@ -157,6 +163,6 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   ball.vx = aimX * power;
   ball.vy = -power * steep * 0.6;
 
-  if (wantsHit) p.hitCooldown = 0.18;
+  p.hitCooldown = 0.18;
   return true;
 }
