@@ -1,0 +1,24 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: #111;
+  overflow: hidden;
+  height: 100%;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#game-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+}
+
+#game {
+  background: #000;
+  image-rendering: pixelated;
+  touch-action: none;
+}

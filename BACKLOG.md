@@ -4,7 +4,7 @@ graphics polish eat time that Tiers 1-3 still need. Tiers 4-5 are best effort
 with whatever time remains.
 
 ## Tier 1, core game
-[ ] sim.js + physics.js + rules.js with tests (no rendering yet)
+[x] sim.js + physics.js + rules.js with tests (no rendering yet)
 [ ] Render court, players, ball with the basic art style; keyboard input
 [ ] Hit, bump, spike mechanics; serve; touches
 [ ] Sets, match, screens, menu
