@@ -7,7 +7,7 @@ with whatever time remains.
 [x] sim.js + physics.js + rules.js with tests (no rendering yet)
 [x] Render court, players, ball with the basic art style; keyboard input
 [x] Hit, bump, spike mechanics; serve; touches
-[ ] Sets, match, screens, menu
+[x] Sets, match, screens, menu
 [ ] CPU opponent, 3 difficulties; headless sim test
 [ ] Touch controls, landscape lock screen, canvas scaling, mobile hardening
 

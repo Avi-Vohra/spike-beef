@@ -10,6 +10,7 @@ html, body {
 }
 
 #game-wrap {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -21,4 +22,64 @@ html, body {
   background: #000;
   image-rendering: pixelated;
   touch-action: none;
+}
+
+#ui-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#ui-overlay:empty {
+  display: none;
+}
+#ui-overlay > * {
+  pointer-events: auto;
+}
+
+.sb-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  background: rgba(36, 26, 20, 0.88);
+  border: 3px solid #f4f1e8;
+  border-radius: 20px;
+  padding: 28px 36px;
+  min-width: 280px;
+  font-family: system-ui, -apple-system, sans-serif;
+  color: #f4f1e8;
+}
+
+.sb-title {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 32px;
+}
+
+.sb-text {
+  font-size: 15px;
+  line-height: 1.6;
+  margin: 0 0 8px;
+}
+
+.sb-btn {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 14px 20px;
+  border-radius: 14px;
+  border: none;
+  background: #ff5d5d;
+  color: #241a14;
+  cursor: pointer;
+}
+.sb-btn:active {
+  transform: translateY(2px);
+}
+.sb-btn-disabled {
+  background: #6b5f52;
+  color: #bbb;
+  cursor: not-allowed;
 }
