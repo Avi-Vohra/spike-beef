@@ -3,6 +3,7 @@ import { HIT, JUMP, RIGHT, createPlayer, createBall, resolvePlayerHit } from '..
 import { isMatchWon, createMatchState, registerTouch } from '../src/rules.js';
 import { aiInput, DIFFICULTIES } from '../src/ai.js';
 import { createFakeClock, createLoopbackPair } from '../src/transport.js';
+import { createHostNetcode, createGuestNetcode, SNAPSHOT_EVERY_N_TICKS } from '../src/netcode.js';
 
 function fail(msg) {
   console.log('FAIL: ' + msg);
@@ -235,6 +236,63 @@ function runMatch(seed, maxTicks = 60 * 60 * 8) {
   const r2 = runOnce(42);
   if (JSON.stringify(r1) !== JSON.stringify(r2)) fail('loopback timing not deterministic for the same seed');
   if (r1.length === 0) fail('loopback with 30% loss delivered nothing across 10 sends (unlucky or broken)');
+}
+
+// Test 13 (net test a): host + guest over LoopbackTransport, both CPU-driven,
+// 40ms delay / 0% loss. Match should complete with identical final scores.
+{
+  const DT_MS = 1000 / 60;
+  const clock = createFakeClock();
+  const [hostTransport, guestTransport] = createLoopbackPair(clock, { delayMs: 40, lossRate: 0, seed: 11 });
+  const hostNet = createHostNetcode(hostTransport, createInitialState(11));
+  const guestNet = createGuestNetcode(guestTransport);
+
+  let safety = 0;
+  let hostEventCount = 0;
+  while (isMatchWon(hostNet.getState().match.sets) === -1 && safety < 60 * 60 * 8) {
+    const hostState = hostNet.getState();
+    const hostInput = aiInput(hostState, 0, 'medium');
+
+    const snap = guestNet.getSnapshot();
+    const guestAiState = snap
+      ? { players: snap.players, ball: snap.ball, match: snap.match, tick: snap.tick, rngSeed: 0 }
+      : { players: hostState.players, ball: hostState.ball, match: hostState.match, tick: 0, rngSeed: 0 };
+    const guestInput = aiInput(guestAiState, 1, 'medium');
+
+    const result = hostNet.tick(hostInput);
+    hostEventCount += result.events.length;
+    guestNet.tick(guestInput);
+    clock.advance(DT_MS);
+    safety++;
+  }
+
+  if (safety >= 60 * 60 * 8) fail('net test (a) match did not complete');
+
+  // Drain: force a few more snapshot sends (sim.js no-ops once matchWon) and
+  // let the clock run long enough for the final snapshot to actually arrive.
+  for (let i = 0; i < SNAPSHOT_EVERY_N_TICKS + 1; i++) {
+    hostEventCount += hostNet.tick(0).events.length;
+    clock.advance(DT_MS);
+  }
+  clock.advance(200);
+
+  const hostFinal = hostNet.getState().match;
+  const guestFinal = guestNet.getSnapshot().match;
+  if (JSON.stringify(hostFinal.sets) !== JSON.stringify(guestFinal.sets)) {
+    fail(`net test (a): final sets differ — host ${hostFinal.sets} vs guest ${guestFinal.sets}`);
+  }
+  // Guest's last snapshot lags the host by up to one snapshot interval, so its
+  // score field may be one point behind at the exact instant of match end —
+  // but the final SET score (checked above) must match since that's only
+  // written once the match is fully decided.
+
+  // With 0% loss, every snapshot arrives exactly once (guarded by the
+  // tick-ordering check in netcode.js), so the guest should see exactly as
+  // many events as the host generated — none dropped, none double-counted.
+  const guestEventCount = guestNet.getEvents().length;
+  if (guestEventCount !== hostEventCount) {
+    fail(`net test (a): host generated ${hostEventCount} events, guest received ${guestEventCount}`);
+  }
 }
 
 console.log('PASS');

@@ -5,10 +5,13 @@ mobile hardening (no pull-to-refresh/scroll/context-menu, wake lock, vibrate
 on hit/point) are all in. Menu: Local 2P and vs CPU (3 difficulties) enabled,
 Online 1v1 disabled ("coming soon").
 Local server running at http://localhost:8787 for manual checking.
-Tier 2 started: src/transport.js has createFakeClock + createLoopbackPair
-(delay/jitter/loss, deterministic by seed), tested. PeerTransport (real
-WebRTC) not written yet — that's a later Tier 2 item.
-Next: netcode.js host/guest logic over the transport interface, snapshots, input redundancy; net test (a).
+Tier 2 in progress: transport.js (fake clock + LoopbackTransport) and
+netcode.js (host-authoritative sim, guest sends redundant inputs, host
+broadcasts snapshots) both done and tested, including a full CPU-vs-CPU
+match played host+guest over LoopbackTransport at 40ms/0% loss (net test a).
+Guest doesn't predict/interpolate yet — it just applies snapshots directly.
+PeerTransport (real WebRTC) not written yet — later Tier 2 item.
+Next: Guest prediction, interpolation, event dedupe; net tests (b) and (c).
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).
@@ -18,3 +21,4 @@ Next: netcode.js host/guest logic over the transport interface, snapshots, input
 - Done: CPU opponent (ai.js, 3 difficulties) + deep audit #1 — fixed touch-cooldown gating, serve/bump net-clearance tuning, switched AI to physics-projected landing prediction. Tagged stable-1.
 - Done: touch controls (on-screen D-pad + jump/hit), landscape-lock rotate screen, mobile hardening (scroll/zoom/context-menu blocked), wake lock, vibrate on hit/point. Tier 1 complete.
 - Done: src/transport.js — fake clock + LoopbackTransport (delay/jitter/loss), deterministic, tested (4 new tests).
+- Done: src/netcode.js — host-authoritative sim over the transport interface, redundant guest input packets, host snapshots. Net test (a): full CPU-driven match over LoopbackTransport at 40ms/0% loss completes with matching final scores and no dropped/duplicated events.

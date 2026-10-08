@@ -13,7 +13,7 @@ with whatever time remains.
 
 ## Tier 2, online
 [x] Transport interface + LoopbackTransport + fake clock
-[ ] netcode.js host/guest, snapshots, input redundancy; net test (a)
+[x] netcode.js host/guest, snapshots, input redundancy; net test (a)
 [ ] Guest prediction, interpolation, event dedupe; net tests (b) and (c)
 [ ] PeerTransport, room codes, share link, join by link, error screens
 [ ] Lobby, names, ready, countdown, mirrored guest view
