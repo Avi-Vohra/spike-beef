@@ -6,9 +6,12 @@
 // every few ticks. This module only talks to the transport interface — it
 // never knows if that's PeerTransport or LoopbackTransport.
 import { step } from './sim.js';
+import { stepPlayer, createPlayer, DT, SUBSTEPS } from './physics.js';
 
 export const SNAPSHOT_EVERY_N_TICKS = 2; // 60Hz sim -> ~30Hz snapshots
 export const INPUT_HISTORY = 3;
+export const INTERP_DELAY_TICKS = 6; // render ball/opponent ~100ms behind
+export const RECONCILE_SNAP_DISTANCE = 60; // px: beyond this, hard-snap self
 
 // packet: [tick, ballX, ballY, ballVx, ballVy, p0x, p0y, p1x, p1y,
 //          score0, score1, sets0, sets1, server, phaseCode, ackSeq, events]
@@ -57,12 +60,22 @@ export function createHostNetcode(transport, initialState) {
   return { tick, getState: () => state };
 }
 
+const HISTORY_CAP = 12;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
 export function createGuestNetcode(transport) {
   let seq = 0;
   const recentInputs = [];
   let lastSnapshot = null;
   let lastProcessedTick = -1;
-  const eventLog = []; // [{tick, type}], each fired exactly once
+  const eventLog = []; // [{tick, type}], each fired exactly once — dedupe
+  // is guaranteed by the tick-ordering guard below: a snapshot older than or
+  // equal to the last one accepted (whether late, reordered, or a true
+  // resend) is dropped, so its events can never be logged twice.
+  const history = []; // recent snapshots, oldest first, for interpolation
+  let localTick = 0;
+  let predictedSelf = createPlayer(1);
 
   transport.onMessage((packet) => {
     const [tick, bx, by, bvx, bvy, p0x, p0y, p1x, p1y, score0, score1, sets0, sets1, server, phaseCode, ackSeq, events] = packet;
@@ -75,7 +88,20 @@ export function createGuestNetcode(transport) {
       match: { score: [score0, score1], sets: [sets0, sets1], server, phase: codeToPhase(phaseCode) },
       ackSeq,
     };
+    history.push(lastSnapshot);
+    if (history.length > HISTORY_CAP) history.shift();
     for (const type of events) eventLog.push({ tick, type });
+
+    // Reconcile local prediction of our own avatar against the authoritative
+    // position: snap only if the error is large, otherwise trust prediction
+    // and let it converge naturally (avoids visible teleporting).
+    const authoritative = lastSnapshot.players[1];
+    const dx = authoritative.x - predictedSelf.x;
+    const dy = authoritative.y - predictedSelf.y;
+    if (Math.hypot(dx, dy) > RECONCILE_SNAP_DISTANCE) {
+      predictedSelf.x = authoritative.x;
+      predictedSelf.y = authoritative.y;
+    }
   });
 
   function tick(localInput) {
@@ -83,7 +109,40 @@ export function createGuestNetcode(transport) {
     recentInputs.unshift(localInput);
     if (recentInputs.length > INPUT_HISTORY) recentInputs.length = INPUT_HISTORY;
     transport.send([seq, ...recentInputs]);
+
+    localTick += 1;
+    for (let s = 0; s < SUBSTEPS; s++) stepPlayer(predictedSelf, localInput, DT / SUBSTEPS);
   }
 
-  return { tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog };
+  // Ball and the opponent (host's side) are rendered ~INTERP_DELAY_TICKS
+  // behind, interpolated between the two snapshots bracketing that target
+  // tick — smooths over the gaps between the ~30Hz snapshot rate.
+  function getRenderState() {
+    if (history.length === 0) {
+      return { ball: null, opponent: null, self: predictedSelf, match: null };
+    }
+    const targetTick = (lastSnapshot ? lastSnapshot.tick : 0) - INTERP_DELAY_TICKS;
+    let a = history[0];
+    let b = history[history.length - 1];
+    for (let i = 0; i < history.length - 1; i++) {
+      if (history[i].tick <= targetTick && history[i + 1].tick >= targetTick) {
+        a = history[i];
+        b = history[i + 1];
+        break;
+      }
+    }
+    const span = b.tick - a.tick;
+    const t = span > 0 ? Math.min(1, Math.max(0, (targetTick - a.tick) / span)) : 1;
+    return {
+      ball: {
+        x: lerp(a.ball.x, b.ball.x, t), y: lerp(a.ball.y, b.ball.y, t),
+        vx: lerp(a.ball.vx, b.ball.vx, t), vy: lerp(a.ball.vy, b.ball.vy, t),
+      },
+      opponent: { x: lerp(a.players[0].x, b.players[0].x, t), y: lerp(a.players[0].y, b.players[0].y, t) },
+      self: predictedSelf,
+      match: lastSnapshot.match,
+    };
+  }
+
+  return { tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState };
 }
