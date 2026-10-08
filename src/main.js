@@ -1,6 +1,6 @@
 import { createInitialState, step } from './sim.js';
 import { render } from './render.js';
-import { createKeyboardInput } from './input.js';
+import { createKeyboardInput, createTouchInput } from './input.js';
 import { renderMenu, renderHowToPlay, renderMatchEnd, renderPause, hideOverlay } from './ui.js';
 import { createAi } from './ai.js';
 
@@ -23,6 +23,28 @@ window.addEventListener('resize', resize);
 resize();
 
 const keyboard = createKeyboardInput();
+const touch = createTouchInput();
+
+// Mobile hardening: block pull-to-refresh/scroll and the long-press context
+// menu so touch play never fights the browser chrome.
+document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
+document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+let wakeLock = null;
+async function acquireWakeLock() {
+  try {
+    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
+  } catch {
+    // Wake Lock isn't available everywhere — fine to silently skip.
+  }
+}
+function releaseWakeLock() {
+  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
+}
+
+function vibrate(ms) {
+  if (navigator.vibrate) navigator.vibrate(ms);
+}
 
 let appScreen = 'menu'; // 'menu' | 'howToPlay' | 'match' | 'paused'
 let state = null;
@@ -30,6 +52,7 @@ let spin = 0;
 let cpu = null; // non-null when P2 is CPU-controlled
 
 function goMenu() {
+  releaseWakeLock();
   appScreen = 'menu';
   cpu = null;
   renderMenu(overlay, {
@@ -44,6 +67,7 @@ function startLocal2P() {
   state = createInitialState(Date.now() & 0xffffffff);
   appScreen = 'match';
   hideOverlay(overlay);
+  acquireWakeLock();
 }
 
 function startVsCpu(difficulty) {
@@ -51,9 +75,11 @@ function startVsCpu(difficulty) {
   state = createInitialState(Date.now() & 0xffffffff);
   appScreen = 'match';
   hideOverlay(overlay);
+  acquireWakeLock();
 }
 
 function onMatchEnd() {
+  releaseWakeLock();
   const rematchDifficulty = cpu ? cpu.difficulty : null;
   renderMatchEnd(overlay, state.match, {
     onRematch: () => (rematchDifficulty ? startVsCpu(rematchDifficulty) : startLocal2P()),
@@ -91,12 +117,16 @@ function frame(now) {
   if (appScreen === 'match' && state) {
     acc += elapsed;
     while (acc >= DT) {
-      const input1 = keyboard.getP1();
+      const input1 = keyboard.getP1() | touch.getMask();
       const input2 = cpu ? cpu.getInput(state) : keyboard.getP2();
       const result = step(state, input1, input2);
       state = result.state;
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
+      for (const ev of result.events) {
+        if (ev === 'hit' || ev === 'spike') vibrate(15);
+        if (ev.type === 'point') vibrate(30);
+      }
       if (state.match.phase === 'matchWon') {
         appScreen = 'matchEnded';
         onMatchEnd();

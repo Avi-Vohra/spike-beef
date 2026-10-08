@@ -10,6 +10,17 @@
   <div id="game-wrap">
     <canvas id="game" width="960" height="540"></canvas>
     <div id="ui-overlay"></div>
+    <div id="touch-controls">
+      <button id="btn-left" class="touch-btn touch-btn-move" aria-label="Left">&#9664;</button>
+      <button id="btn-right" class="touch-btn touch-btn-move" aria-label="Right">&#9654;</button>
+      <button id="btn-jump" class="touch-btn touch-btn-action" aria-label="Jump">JUMP</button>
+      <button id="btn-hit" class="touch-btn touch-btn-action" aria-label="Hit">HIT</button>
+    </div>
+  </div>
+  <div id="rotate-overlay">
+    <div class="sb-panel">
+      <p class="sb-text">Rotate your phone to play Spike Beef.</p>
+    </div>
   </div>
   <script type="module" src="src/main.js"></script>
 </body>

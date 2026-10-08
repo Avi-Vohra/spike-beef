@@ -35,7 +35,10 @@ export function createTouchInput() {
   function bind(id, key) {
     const el = document.getElementById(id);
     if (!el) return;
-    const set = (v) => (state[key] = v);
+    const set = (v) => {
+      state[key] = v;
+      el.classList.toggle('pressed', v);
+    };
     el.addEventListener('touchstart', (e) => { e.preventDefault(); set(true); }, { passive: false });
     el.addEventListener('touchend', (e) => { e.preventDefault(); set(false); }, { passive: false });
     el.addEventListener('touchcancel', (e) => { e.preventDefault(); set(false); }, { passive: false });

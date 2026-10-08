@@ -1,11 +1,11 @@
 # Current state
-Tier 1 COMPLETE: sim/physics/rules/render/input/ui/ai/main all working.
-Menu has Local 2P and vs CPU (easy/medium/hard) enabled; Online 1v1 still disabled ("coming soon").
-Deep audit #1 done (stable-1 tag): found and fixed 3 real physics bugs via the
-200-match CPU-vs-CPU stress test (see DECISIONS.md) — win share and rally
-length are now within spec range.
+TIER 1 FULLY COMPLETE (all 6 items). Touch controls (on-screen buttons,
+pointer:coarse only), landscape-lock rotate screen, canvas DPI scaling, and
+mobile hardening (no pull-to-refresh/scroll/context-menu, wake lock, vibrate
+on hit/point) are all in. Menu: Local 2P and vs CPU (3 difficulties) enabled,
+Online 1v1 disabled ("coming soon").
 Local server running at http://localhost:8787 for manual checking.
-Next: Touch controls, landscape lock screen, canvas scaling, mobile hardening (last Tier 1 item).
+Next: Tier 2 (online) — Transport interface + LoopbackTransport + fake clock.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).
@@ -13,3 +13,4 @@ Next: Touch controls, landscape lock screen, canvas scaling, mobile hardening (l
 - Done: tests for touch-fault counting and spike-vs-bump outcome differences.
 - Done: screens/menu (ui.js DOM overlay) + match-end + pause; Local 2P is the only enabled mode so far.
 - Done: CPU opponent (ai.js, 3 difficulties) + deep audit #1 — fixed touch-cooldown gating, serve/bump net-clearance tuning, switched AI to physics-projected landing prediction. Tagged stable-1.
+- Done: touch controls (on-screen D-pad + jump/hit), landscape-lock rotate screen, mobile hardening (scroll/zoom/context-menu blocked), wake lock, vibrate on hit/point. Tier 1 complete.

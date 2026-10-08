@@ -9,7 +9,7 @@ with whatever time remains.
 [x] Hit, bump, spike mechanics; serve; touches
 [x] Sets, match, screens, menu
 [x] CPU opponent, 3 difficulties; headless sim test
-[ ] Touch controls, landscape lock screen, canvas scaling, mobile hardening
+[x] Touch controls, landscape lock screen, canvas scaling, mobile hardening
 
 ## Tier 2, online
 [ ] Transport interface + LoopbackTransport + fake clock
