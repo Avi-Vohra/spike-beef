@@ -12,7 +12,7 @@ with whatever time remains.
 [x] Touch controls, landscape lock screen, canvas scaling, mobile hardening
 
 ## Tier 2, online
-[ ] Transport interface + LoopbackTransport + fake clock
+[x] Transport interface + LoopbackTransport + fake clock
 [ ] netcode.js host/guest, snapshots, input redundancy; net test (a)
 [ ] Guest prediction, interpolation, event dedupe; net tests (b) and (c)
 [ ] PeerTransport, room codes, share link, join by link, error screens

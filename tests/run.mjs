@@ -2,6 +2,7 @@ import { createInitialState, step } from '../src/sim.js';
 import { HIT, JUMP, RIGHT, createPlayer, createBall, resolvePlayerHit } from '../src/physics.js';
 import { isMatchWon, createMatchState, registerTouch } from '../src/rules.js';
 import { aiInput, DIFFICULTIES } from '../src/ai.js';
+import { createFakeClock, createLoopbackPair } from '../src/transport.js';
 
 function fail(msg) {
   console.log('FAIL: ' + msg);
@@ -179,6 +180,61 @@ function runMatch(seed, maxTicks = 60 * 60 * 8) {
     }
     if (ticks >= 60 * 60 * 8) fail(`difficulty ${difficulty} match did not complete`);
   }
+}
+
+// Test 9: fake clock delivers a scheduled message at the right simulated time.
+{
+  const clock = createFakeClock();
+  let firedAt = -1;
+  clock.schedule(100, () => { firedAt = clock.now(); });
+  clock.advance(50);
+  if (firedAt !== -1) fail('fake clock fired before its scheduled time');
+  clock.advance(50);
+  if (firedAt !== 100) fail(`fake clock fired at wrong time: ${firedAt}`);
+}
+
+// Test 10: loopback transport delivers after the configured delay, in order.
+{
+  const clock = createFakeClock();
+  const [a, b] = createLoopbackPair(clock, { delayMs: 50, seed: 1 });
+  const received = [];
+  b.onMessage((msg) => received.push(msg));
+  a.send('hello');
+  a.send('world');
+  clock.advance(49);
+  if (received.length !== 0) fail('loopback delivered before the configured delay');
+  clock.advance(1);
+  if (received.length !== 2 || received[0] !== 'hello' || received[1] !== 'world') {
+    fail(`loopback delivery wrong: ${JSON.stringify(received)}`);
+  }
+}
+
+// Test 11: 100% loss rate means nothing is ever delivered.
+{
+  const clock = createFakeClock();
+  const [a, b] = createLoopbackPair(clock, { delayMs: 10, lossRate: 1, seed: 2 });
+  let got = false;
+  b.onMessage(() => (got = true));
+  for (let i = 0; i < 20; i++) a.send(`msg${i}`);
+  clock.advance(1000);
+  if (got) fail('100% loss rate still delivered a message');
+}
+
+// Test 12: same seed/options gives identical delivery timing (determinism).
+{
+  function runOnce(seed) {
+    const clock = createFakeClock();
+    const [a, b] = createLoopbackPair(clock, { delayMs: 50, jitterMs: 20, lossRate: 0.3, seed });
+    const log = [];
+    b.onMessage((msg) => log.push({ t: clock.now(), msg }));
+    for (let i = 0; i < 10; i++) { a.send(`m${i}`); clock.advance(10); }
+    clock.advance(200);
+    return log;
+  }
+  const r1 = runOnce(42);
+  const r2 = runOnce(42);
+  if (JSON.stringify(r1) !== JSON.stringify(r2)) fail('loopback timing not deterministic for the same seed');
+  if (r1.length === 0) fail('loopback with 30% loss delivered nothing across 10 sends (unlucky or broken)');
 }
 
 console.log('PASS');
