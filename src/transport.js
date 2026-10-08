@@ -73,3 +73,67 @@ export function createLoopbackPair(clock, options = {}) {
   bRef = b;
   return [a, b];
 }
+
+// Room codes skip O, I, L — too easy to confuse with 0, 1 at a glance.
+const ROOM_CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ';
+const PEER_ID_PREFIX = 'spikebeef-';
+
+export function randomRoomCode() {
+  let code = '';
+  for (let i = 0; i < 4; i++) {
+    code += ROOM_CODE_ALPHABET[Math.floor(Math.random() * ROOM_CODE_ALPHABET.length)];
+  }
+  return code;
+}
+
+export function roomCodeToPeerId(code) {
+  return PEER_ID_PREFIX + code.toUpperCase();
+}
+
+// Wraps a PeerJS DataConnection to match the Transport interface. Browser-
+// only (needs the global Peer from the pinned PeerJS CDN script tag in
+// index.html) — not imported by anything that runs in Node.
+function wrapDataConnection(conn) {
+  let onMessageCb = null;
+  let onCloseCb = null;
+  conn.on('data', (msg) => { if (onMessageCb) onMessageCb(msg); });
+  conn.on('close', () => { if (onCloseCb) onCloseCb(); });
+  conn.on('error', () => { if (onCloseCb) onCloseCb(); });
+  return {
+    send(msg) { if (conn.open) conn.send(msg); },
+    onMessage(cb) { onMessageCb = cb; },
+    onClose(cb) { onCloseCb = cb; },
+    close() { conn.close(); },
+  };
+}
+
+// Host side: claims "spikebeef-<CODE>" as its PeerJS id and waits for one
+// guest to connect. Calls onReady(transport) once connected, onError(err)
+// if the id is already taken (room code collision — vanishingly rare) or
+// the signaling connection itself fails.
+export function createPeerHost(code, { onReady, onError }) {
+  const peer = new window.Peer(roomCodeToPeerId(code));
+  let connected = false;
+  peer.on('connection', (conn) => {
+    if (connected) { conn.close(); return; } // room full — first guest wins
+    conn.on('open', () => {
+      connected = true;
+      onReady(wrapDataConnection(conn));
+    });
+  });
+  peer.on('error', (err) => onError(err));
+  return { close: () => peer.destroy() };
+}
+
+// Guest side: connects to the host's "spikebeef-<CODE>" id. onError fires on
+// a bad/missing room code, a full room, or any connection failure.
+export function createPeerGuest(code, { onReady, onError }) {
+  const peer = new window.Peer();
+  peer.on('open', () => {
+    const conn = peer.connect(roomCodeToPeerId(code), { reliable: true });
+    conn.on('open', () => onReady(wrapDataConnection(conn)));
+    conn.on('error', (err) => onError(err));
+  });
+  peer.on('error', (err) => onError(err));
+  return { close: () => peer.destroy() };
+}

@@ -84,6 +84,23 @@ html, body {
   cursor: not-allowed;
 }
 
+.sb-input {
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-align: center;
+  text-transform: uppercase;
+  padding: 12px;
+  border-radius: 10px;
+  border: 2px solid #f4f1e8;
+  background: #fff;
+  color: #241a14;
+}
+
+.sb-error {
+  color: #ff9d9d;
+}
+
 /* Touch controls: only shown on touch-capable devices, positioned clear of
    the court so thumbs never cover play. */
 #touch-controls {

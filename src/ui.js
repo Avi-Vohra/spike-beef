@@ -13,7 +13,7 @@ function clear(root) {
   root.innerHTML = '';
 }
 
-export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu }) {
+export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu, onOnline }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
@@ -22,18 +22,102 @@ export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu }) {
   title.textContent = 'Spike Beef';
   panel.appendChild(title);
 
-  const online = button('Online 1v1 (coming soon)', false);
+  const online = button('Online 1v1', true);
   const cpuEasy = button('vs CPU: Easy', true);
   const cpuMedium = button('vs CPU: Medium', true);
   const cpuHard = button('vs CPU: Hard', true);
   const local = button('Local 2P (same keyboard)', true);
   const howTo = button('How to Play', true);
+  online.addEventListener('click', onOnline);
   cpuEasy.addEventListener('click', () => onCpu('easy'));
   cpuMedium.addEventListener('click', () => onCpu('medium'));
   cpuHard.addEventListener('click', () => onCpu('hard'));
   local.addEventListener('click', onLocal2P);
   howTo.addEventListener('click', onHowToPlay);
   [online, cpuEasy, cpuMedium, cpuHard, local, howTo].forEach((b) => panel.appendChild(b));
+  root.appendChild(panel);
+}
+
+export function renderOnlineMenu(root, { onCreate, onJoin, onBack }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = 'Online 1v1';
+  const create = button('Create Room');
+  const join = button('Join Room');
+  const back = button('Back');
+  create.addEventListener('click', onCreate);
+  join.addEventListener('click', onJoin);
+  back.addEventListener('click', onBack);
+  [title, create, join, back].forEach((el) => panel.appendChild(el));
+  root.appendChild(panel);
+}
+
+export function renderCreateWaiting(root, code, { onShare, onCancel }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = code;
+  const status = document.createElement('p');
+  status.className = 'sb-text';
+  status.textContent = 'Waiting for opponent to join...';
+  const share = button('Share Link');
+  const cancel = button('Cancel');
+  share.addEventListener('click', onShare);
+  cancel.addEventListener('click', onCancel);
+  [title, status, share, cancel].forEach((el) => panel.appendChild(el));
+  root.appendChild(panel);
+}
+
+export function renderJoinEntry(root, { onSubmit, onBack, error, prefillCode }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = 'Join Room';
+  const input = document.createElement('input');
+  input.className = 'sb-input';
+  input.maxLength = 4;
+  input.placeholder = 'CODE';
+  input.value = prefillCode || '';
+  input.autocapitalize = 'characters';
+  const submit = button('Join');
+  const back = button('Back');
+  if (error) {
+    const err = document.createElement('p');
+    err.className = 'sb-text sb-error';
+    err.textContent = error;
+    panel.appendChild(title);
+    panel.appendChild(err);
+  } else {
+    panel.appendChild(title);
+  }
+  panel.appendChild(input);
+  submit.addEventListener('click', () => onSubmit(input.value.trim().toUpperCase()));
+  back.addEventListener('click', onBack);
+  panel.appendChild(submit);
+  panel.appendChild(back);
+  root.appendChild(panel);
+}
+
+export function renderConnecting(root, message, { onCancel } = {}) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const text = document.createElement('p');
+  text.className = 'sb-text';
+  text.textContent = message || 'Connecting...';
+  panel.appendChild(text);
+  if (onCancel) {
+    const cancel = button('Cancel');
+    cancel.addEventListener('click', onCancel);
+    panel.appendChild(cancel);
+  }
   root.appendChild(panel);
 }
 
