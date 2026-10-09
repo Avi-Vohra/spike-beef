@@ -44,7 +44,7 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 window.addEventListener('pointerdown', unlockAudio, { once: true });
 window.addEventListener('keydown', unlockAudio, { once: true });
 
-initTauntBar((id) => { if (online) online.sendTaunt(id); });
+initTauntBar((kind, value) => { if (online) online.sendTaunt(kind, value); });
 
 let appScreen = 'menu';
 let state = null;

@@ -166,6 +166,41 @@ html, body {
   opacity: 0.35;
 }
 
+#quick-lines {
+  display: none;
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  flex-direction: column;
+  gap: 4px;
+  background: rgba(36, 26, 20, 0.88);
+  border: 2px solid rgba(244, 241, 232, 0.85);
+  border-radius: 12px;
+  padding: 8px;
+  z-index: 7;
+  pointer-events: auto;
+  max-width: 220px;
+}
+#quick-lines.visible {
+  display: flex;
+}
+.quick-line-btn {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: none;
+  background: #3a2c20;
+  color: #f4f1e8;
+  text-align: left;
+  white-space: nowrap;
+}
+.quick-line-btn:active {
+  background: #ff5d5d;
+  color: #241a14;
+}
+
 #rotate-overlay {
   display: none;
   position: fixed;

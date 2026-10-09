@@ -21,7 +21,7 @@ with whatever time remains.
 
 ## Tier 3, trash talk
 [x] Emote taunts with bubbles and sounds, synced online
-[ ] Quick lines menu
+[x] Quick lines menu
 [ ] Announcer callouts and streaks
 [ ] Character reactions and faces
 [ ] End cards, stats, slow-motion final point replay

@@ -1,7 +1,7 @@
 // Character drawing: the limbed player figure and its emote speech bubble.
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
-import { GROUND_Y, PLAYER_RADIUS } from './physics.js';
+import { GROUND_Y, PLAYER_RADIUS, WIDTH } from './physics.js';
 import { PALETTE, outlinedCircle, roundRect, capsule, chargeColor } from './art.js';
 
 const LEG_LEN = 15;
@@ -111,29 +111,41 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall) {
 }
 
 export function drawEmoteBubble(ctx, p, emote) {
-  if (!emote || !emote.id || emote.timer <= 0) return;
+  if (!emote || !emote.value || emote.timer <= 0) return;
+  const isLine = emote.kind === 'line';
+  const duration = isLine ? 2.2 : 1.6;
   const bubbleY = p.y - LEG_LEN - TORSO_LEN - HEAD_R * 1.6 - 22;
-  const pop = Math.min(1, (1.6 - emote.timer) / 0.15); // quick pop-in
+  const pop = Math.min(1, (duration - emote.timer) / 0.15); // quick pop-in
   const scale = 0.7 + 0.3 * Math.min(1, pop);
+
+  ctx.font = isLine ? 'bold 12px system-ui, sans-serif' : '20px system-ui, sans-serif';
+  const text = isLine ? emote.value : (EMOTE_GLYPH[emote.value] || '');
+  const textW = ctx.measureText(text).width;
+  const w = isLine ? Math.min(150, textW + 20) : 34;
+  const h = isLine ? 26 : 30;
+
+  // Keep the bubble on-canvas even near the side walls.
+  const bx = Math.max(w / 2 + 4, Math.min(WIDTH - w / 2 - 4, p.x)) - p.x;
+
   ctx.save();
-  ctx.translate(p.x, bubbleY);
+  ctx.translate(p.x + bx, bubbleY);
   ctx.scale(scale, scale);
   ctx.fillStyle = 'rgba(255,255,255,0.92)';
   ctx.strokeStyle = PALETTE.outline;
   ctx.lineWidth = 2;
-  roundRect(ctx, -17, -17, 34, 30, 10);
+  roundRect(ctx, -w / 2, -h / 2 - 2, w, h, isLine ? 8 : 10);
   ctx.fill();
   ctx.stroke();
   ctx.beginPath();
-  ctx.moveTo(-5, 12);
-  ctx.lineTo(0, 22);
-  ctx.lineTo(7, 12);
+  ctx.moveTo(-bx - 5, h / 2 + 10);
+  ctx.lineTo(-bx, h / 2 + 20);
+  ctx.lineTo(-bx + 7, h / 2 + 10);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
-  ctx.font = '20px system-ui, sans-serif';
+  ctx.fillStyle = PALETTE.outline;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(EMOTE_GLYPH[emote.id] || '', 0, -1);
+  ctx.fillText(text, 0, -3);
   ctx.restore();
 }

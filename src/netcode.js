@@ -31,7 +31,7 @@ export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
   // taunts never reach, or affect, the sim.
   transport.onMessage((packet) => {
     if (!Array.isArray(packet)) {
-      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.id);
+      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
       return;
     }
     const [seq, ...inputs] = packet;
@@ -41,7 +41,7 @@ export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
     }
   });
 
-  function sendTaunt(id) { transport.send({ t: 'emote', id }); }
+  function sendTaunt(kind, value) { transport.send({ t: 'emote', kind, value }); }
 
   function tick(hostInput) {
     const result = step(state, hostInput, currentGuestInput);
@@ -86,11 +86,11 @@ export function createGuestNetcode(transport, { onTaunt } = {}) {
   let localTick = 0;
   let predictedSelf = createPlayer(1);
 
-  function sendTaunt(id) { transport.send({ t: 'emote', id }); }
+  function sendTaunt(kind, value) { transport.send({ t: 'emote', kind, value }); }
 
   transport.onMessage((packet) => {
     if (!Array.isArray(packet)) {
-      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.id);
+      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
       return;
     }
     const [tick, bx, by, bvx, bvy, p0x, p0y, p1x, p1y, score0, score1, sets0, sets1, server, phaseCode, ackSeq, events] = packet;
