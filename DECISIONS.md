@@ -167,7 +167,7 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
     side that's still there wins — matches "leaving mid-match = forfeit, the stayer is
     told so." I did NOT freeze the local sim/input loop during the reconnecting window
     (considered it, decided the risk of a half-tested pause/resume interaction wasn't
-    worth it for a scenario — real connection loss — I can't exercise end-to-end myself);
+    worth it for a scenario (real connection loss) I can't exercise end-to-end myself);
     the countdown and eventual forfeit are the real behavior, "frozen" is just how it
     looks in practice once no new data arrives.
   - **Same-room rematch**: `netcode.js` now also recognizes a `{t:'rematchReady'}`
@@ -197,3 +197,10 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   against which world side THIS client is (host=0, guest=1), not against display
   index — same host/guest asymmetry the taunt-stats bug earlier was about, applied
   correctly here from the start.
+- Closed out the remaining partial Tier 4 items: net sway is a damped spring in fx.js
+  (triggered by `triggerNetSway()` on every netBounce event, direction from the ball's
+  velocity at bounce time), the sea got a live animated wave line drawn on top of the
+  pre-rendered static background each frame (everything else about the background stays
+  static, for the same perf reason the background is pre-rendered at all), and screen
+  transitions are a plain CSS fade/scale-in animation on `.sb-panel` — no JS state
+  machine needed, every DOM overlay screen already shares that one class.

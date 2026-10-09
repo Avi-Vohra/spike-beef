@@ -28,12 +28,12 @@ with whatever time remains.
 [x] Head-to-head record
 
 ## Tier 4, graphics and feel
-[~] Full beach background with parallax, pre-rendered — clouds parallax in, sea is still static (not a wave layer)
+[x] Full beach background with parallax, pre-rendered — clouds parallax + animated sea wave line on top of the static bgCanvas
 [x] Character animation: run, jump, hit, squash/stretch, eye tracking — done via the mid-session redesign (limbed run/charge/swing animation)
 [x] Ball spin, shadow, trail, landing marker — done via the mid-session redesign
-[~] Particles, screen shake, confetti, net sway — particles/shake/confetti done (fx.js); net never sways on contact (drawNet always passes 0)
+[x] Particles, screen shake, confetti, net sway — net now sways via a damped spring, nudged on every netBounce event
 [x] Sound set + mute button; vibration — done (audio.js, generated tones, no files)
-[~] UI polish: buttons, score pills, transitions between screens — buttons/score pills existed already; no animated transitions between screens
+[x] UI polish: buttons, score pills, transitions between screens — screens now fade/scale in via a CSS animation on .sb-panel
 [~] Physics feel tuning from sim stats — iterated extensively via the 200-match harness; CPU-vs-CPU win-share balance remains an open, documented issue (see DECISIONS.md)
 
 ## Tier 5, extras

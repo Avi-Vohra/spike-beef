@@ -70,6 +70,21 @@ function drawClouds(ctx, timeSec) {
   }
 }
 
+// A moving wave line along the sea's near edge — the only part of the sea
+// that animates; everything else stays in the pre-rendered static bgCanvas
+// for performance.
+function drawSeaWave(ctx, timeSec) {
+  const waveY = GROUND_Y - 62;
+  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x <= WIDTH; x += 12) {
+    const y = waveY + Math.sin(x * 0.04 + timeSec * 1.6) * 3;
+    if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
 function drawNet(ctx, sway) {
   ctx.strokeStyle = PALETTE.netPost;
   ctx.lineWidth = 8;
@@ -202,12 +217,13 @@ function drawBanner(ctx, text) {
   ctx.restore();
 }
 
-export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null) {
+export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null, netSway = 0) {
   if (!bgCanvas) buildBackground();
   ctx.drawImage(bgCanvas, 0, 0);
   drawClouds(ctx, timeSec);
+  drawSeaWave(ctx, timeSec);
 
-  drawNet(ctx, 0);
+  drawNet(ctx, netSway);
   drawLandingMarker(ctx, state.ball, state.match.phase);
 
   const [p1, p2] = state.players;

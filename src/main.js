@@ -310,7 +310,7 @@ function frame(now) {
     const shake = fx.getShakeOffset();
     ctx.save();
     ctx.translate(shake.x, shake.y);
-    render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null);
+    render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null, fx.getNetSway());
     fx.draw(ctx);
     ctx.restore();
   }

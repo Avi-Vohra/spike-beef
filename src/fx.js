@@ -4,10 +4,16 @@ const MAX_PARTICLES = 150;
 let particles = [];
 let shakeTime = 0;
 let shakeMag = 0;
+let netSway = 0;
+let netSwayVel = 0;
 
 export function triggerShake(mag, duration = 0.15) {
   shakeMag = Math.max(shakeMag, mag);
   shakeTime = Math.max(shakeTime, duration);
+}
+
+export function triggerNetSway(amount) {
+  netSwayVel += amount;
 }
 
 function spawn(x, y, count, color, speed, life, size) {
@@ -43,6 +49,11 @@ export function update(dt) {
   if (shakeTime > 0) shakeTime -= dt;
   else shakeMag = 0;
 
+  // Net sway: a tiny damped spring, nudged by triggerNetSway() on contact.
+  netSway += netSwayVel * dt;
+  netSwayVel -= netSway * 90 * dt;
+  netSwayVel *= 0.88;
+
   const GRAVITY_FX = 500;
   particles = particles.filter((p) => p.life > 0);
   for (const p of particles) {
@@ -52,6 +63,8 @@ export function update(dt) {
     p.life -= dt;
   }
 }
+
+export function getNetSway() { return netSway; }
 
 export function getShakeOffset() {
   if (shakeTime <= 0 || shakeMag <= 0) return { x: 0, y: 0 };
@@ -74,4 +87,6 @@ export function reset() {
   particles = [];
   shakeTime = 0;
   shakeMag = 0;
+  netSway = 0;
+  netSwayVel = 0;
 }

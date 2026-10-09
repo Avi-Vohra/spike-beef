@@ -48,8 +48,12 @@ no new room code) via a netcode-level rematchReady handshake. Verified
 silentMs timing and rematchReady signaling directly over LoopbackTransport.
 main.js is ~319 lines (over the ~300 guideline) — accepted rather than
 risking a hasty untested refactor; reasoning in DECISIONS.md.
-Next: Tier 4 remaining polish (net sway, sea animation, screen
-transitions) or Tier 5 extras — whichever's asked for.
+TIER 4 FULLY COMPLETE too (net sway, animated sea wave, CSS screen
+transitions closed out the last 3 partial items). Only Tier 4's "physics
+feel tuning" stays flagged [~] since the CPU-balance issue is an accepted
+open item, not something left undone.
+Next: Tier 5 extras (dive/block/charged-serve, extra courts, unlockables,
+settings, practice mode, installable/PWA) — or whatever's asked for.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).
