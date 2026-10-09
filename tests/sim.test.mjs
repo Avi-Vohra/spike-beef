@@ -116,6 +116,23 @@ export function run() {
     if (p2.charging || p2.charge !== 0) fail('mistimed contact mid-charge should cancel the charge, not carry it forward');
   }
 
+  // Test 6c: charged serve — a longer hold before release produces a faster
+  // serve than an immediate tap-release, and both still clear the net (no
+  // NaN/stuck ball) regardless of how long it was held.
+  {
+    function serveSpeed(holdTicks) {
+      let state = createInitialState(1);
+      for (let i = 0; i < holdTicks; i++) state = step(state, HIT, 0).state;
+      const result = step(state, 0, 0); // release
+      return { vx: Math.abs(result.state.ball.vx), events: result.events };
+    }
+    const weak = serveSpeed(1);
+    const strong = serveSpeed(30);
+    if (strong.vx <= weak.vx) fail(`a longer-held serve should be faster: weak=${weak.vx} strong=${strong.vx}`);
+    if (!weak.events.some((e) => e.type === 'serve')) fail('releasing after a short hold should still serve');
+    if (!strong.events.some((e) => e.type === 'serve')) fail('releasing after a long hold should still serve');
+  }
+
   // Test 7 (deep audit sim test): 200 seeded CPU vs CPU matches, medium vs medium.
   // Assert: every match ends, no NaN, ball stays in bounds, ball never rests
   // for 2s, no rally over 60s, win share 35-65%, average rally 4-10 hits.

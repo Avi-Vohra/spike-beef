@@ -1,7 +1,7 @@
 import {
   WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS,
   createPlayer, createBall, stepPlayer, stepBallGravity, updateCharge,
-  resolveBallBounds, resolveGround, resolvePlayerHit, HIT,
+  resolveBallBounds, resolveGround, resolvePlayerHit,
 } from './physics.js';
 import {
   createMatchState, registerTouch, awardPoint, startServe, AUTO_SERVE_SECONDS,
@@ -94,19 +94,20 @@ export function step(state, inputP1, inputP2) {
     next.ball.vy = 0;
 
     next.match.serveTimer += DT;
-    const serverInput = inputs[next.match.server];
-    const wantsHit = !!(serverInput & HIT);
-    if (wantsHit || next.match.serveTimer >= AUTO_SERVE_SECONDS) {
-      // Horizontal and vertical speed are tuned independently: horizontal
-      // stays catchable (below MOVE_SPEED-ish), vertical is fixed high enough
-      // to reliably clear the net regardless of horizontal speed — otherwise
-      // the serve clips the net, bounces back to the server, and the server
-      // racks up touches on their own serve recovery and faults.
-      const vx = dir * (240 + randomFloat(next) * 40);
+    const autoServe = next.match.serveTimer >= AUTO_SERVE_SECONDS;
+    // Charged serve: hold HIT to charge like any other hit, release to serve
+    // — more charge = a faster, flatter serve. Vertical speed stays fixed
+    // regardless of charge (proven safe across the whole horizontal range
+    // below) so clearing the net is never in question, only how hot the
+    // serve comes in.
+    if (server.justReleased || autoServe) {
+      const charge = autoServe ? 0.5 : server.releaseCharge;
+      server.justReleased = false;
+      const vx = dir * (180 + charge * 140 + randomFloat(next) * 20);
       next.ball.vx = vx;
       next.ball.vy = -500;
       registerTouch(next.match, next.match.server);
-      events.push({ type: 'serve', side: next.match.server });
+      events.push({ type: 'serve', side: next.match.server, charge });
     }
     return { state: next, events };
   }

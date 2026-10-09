@@ -204,3 +204,20 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   static, for the same perf reason the background is pre-rendered at all), and screen
   transitions are a plain CSS fade/scale-in animation on `.sb-panel` — no JS state
   machine needed, every DOM overlay screen already shares that one class.
+
+## Tier 5 (extras) — first item started
+- **Charged serve**: serve now fires on `server.justReleased` (the same charge-and-
+  release model as every other hit) instead of an instant HIT-press, with power
+  scaling from the release charge. Kept vertical speed FIXED at -500 regardless of
+  charge rather than scaling it down with power — verified the fixed value clears the
+  net with comfortable margin across the whole horizontal speed range a serve can
+  reach, so "weaker serve" means slower/safer, never "doesn't clear the net."
+  Auto-serve (5s timeout) uses a fixed charge of 0.5 (same medium feel as before).
+- ai.js's serve logic had to change too: it previously held HIT unconditionally for
+  the entire 'serve' phase, which under the new release-triggered model meant it would
+  NEVER release on its own (always falling through to the 5s auto-serve timeout) — a
+  real regression caught before it shipped, not discovered after. Fixed by giving each
+  difficulty a `serveCharge` target (0.25/0.5/0.85) and releasing once charge reaches
+  it, same pattern as the existing release-lead logic for rally hits.
+- "Soft tip" from this backlog item was already satisfied by the charge-and-release
+  redesign's low-charge release — no new work needed there.

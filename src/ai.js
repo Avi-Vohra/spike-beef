@@ -21,9 +21,9 @@ export const DIFFICULTIES = ['easy', 'medium', 'hard'];
 // as timing precision, not an arbitrary "power" number, so a weak CPU looks
 // like it's mistiming its swing rather than just hitting a soft-coded cap.
 const PROFILES = {
-  easy: { deadzone: 60, predictiveness: 0.35, jumpThreshold: 70, wantsSpike: false, releaseLead: 55 },
-  medium: { deadzone: 25, predictiveness: 0.7, jumpThreshold: 45, wantsSpike: true, releaseLead: 26 },
-  hard: { deadzone: 8, predictiveness: 0.95, jumpThreshold: 30, wantsSpike: true, releaseLead: 12 },
+  easy: { deadzone: 60, predictiveness: 0.35, jumpThreshold: 70, wantsSpike: false, releaseLead: 55, serveCharge: 0.25 },
+  medium: { deadzone: 25, predictiveness: 0.7, jumpThreshold: 45, wantsSpike: true, releaseLead: 26, serveCharge: 0.5 },
+  hard: { deadzone: 8, predictiveness: 0.95, jumpThreshold: 30, wantsSpike: true, releaseLead: 12, serveCharge: 0.85 },
 };
 
 const CONTACT_RADIUS = PLAYER_RADIUS + BALL_RADIUS;
@@ -34,9 +34,10 @@ export function aiInput(state, side, difficulty = 'medium') {
   const p = state.players[side];
   const ball = state.ball;
 
-  // Serve immediately on our own turn instead of waiting for auto-serve.
+  // Serve: hold HIT to charge up to this difficulty's target, then release
+  // — matches the charged-serve model instead of waiting for auto-serve.
   if (state.match.phase === 'serve' && state.match.server === side) {
-    return HIT;
+    return p.charge < profile.serveCharge ? HIT : 0;
   }
 
   let mask = 0;
