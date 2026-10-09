@@ -12,26 +12,14 @@ import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
 import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName } from './device.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
-import { processEvents } from './gameEvents.js';
+import { processEvents, updateBanner, bannerState, resetAnnouncer } from './gameEvents.js';
 import { initTauntBar, setTauntBarVisible, update as updateTaunts, emoteState, receiveRemote } from './taunts.js';
+import { setupCanvasScaling } from './canvasScale.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 const overlay = document.getElementById('ui-overlay');
-const LOGICAL_W = 960;
-const LOGICAL_H = 540;
-
-function resize() {
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const scale = Math.min(window.innerWidth / LOGICAL_W, window.innerHeight / LOGICAL_H);
-  canvas.style.width = `${LOGICAL_W * scale}px`;
-  canvas.style.height = `${LOGICAL_H * scale}px`;
-  canvas.width = LOGICAL_W * dpr;
-  canvas.height = LOGICAL_H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-}
-window.addEventListener('resize', resize);
-resize();
+setupCanvasScaling(canvas, ctx, 960, 540);
 
 const keyboard = createKeyboardInput();
 const touch = createTouchInput();
@@ -170,6 +158,7 @@ function startOnlineMatch() {
   appScreen = 'match';
   hideOverlay(overlay);
   acquireWakeLock();
+  resetAnnouncer();
 }
 
 function startLocal2P() {
@@ -178,6 +167,7 @@ function startLocal2P() {
   appScreen = 'match';
   hideOverlay(overlay);
   acquireWakeLock();
+  resetAnnouncer();
 }
 
 function startVsCpu(difficulty) {
@@ -186,6 +176,7 @@ function startVsCpu(difficulty) {
   appScreen = 'match';
   hideOverlay(overlay);
   acquireWakeLock();
+  resetAnnouncer();
 }
 
 function onMatchEnd() {
@@ -249,6 +240,9 @@ function frame(now) {
   } else if (appScreen === 'match' && online) {
     acc += elapsed;
     while (acc >= DT) {
+      const matchBefore = state && state.match
+        ? { score: [...state.match.score], server: state.match.server, rallyHits: state.match.rallyHits }
+        : null;
       const localInput = keyboard.getP1() | touch.getMask();
       const result = online.tick(localInput);
       acc -= DT;
@@ -256,7 +250,10 @@ function frame(now) {
       if (display) {
         state = display;
         spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
-        if (result) processEvents(result.events, state.ball);
+        if (result && matchBefore) {
+          matchBefore.setsAfter = state.match.sets;
+          processEvents(result.events, state.ball, matchBefore);
+        }
         if (state.match.phase === 'matchWon') {
           appScreen = 'matchEnded';
           onMatchEnd();
@@ -267,13 +264,15 @@ function frame(now) {
   } else if (appScreen === 'match' && state) {
     acc += elapsed;
     while (acc >= DT) {
+      const matchBefore = { score: [...state.match.score], server: state.match.server, rallyHits: state.match.rallyHits };
       const input1 = keyboard.getP1() | touch.getMask();
       const input2 = cpu ? cpu.getInput(state) : keyboard.getP2();
       const result = step(state, input1, input2);
       state = result.state;
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
-      hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball));
+      matchBefore.setsAfter = state.match.sets;
+      hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball, matchBefore));
       if (state.match.phase === 'matchWon') {
         appScreen = 'matchEnded';
         onMatchEnd();
@@ -284,12 +283,13 @@ function frame(now) {
 
   fx.update(elapsed);
   updateTaunts(elapsed);
+  updateBanner(elapsed);
   setTauntBarVisible(appScreen === 'match');
   if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded')) {
     const shake = fx.getShakeOffset();
     ctx.save();
     ctx.translate(shake.x, shake.y);
-    render(ctx, state, spin, now / 1000, emoteState);
+    render(ctx, state, spin, now / 1000, emoteState, bannerState.text);
     fx.draw(ctx);
     ctx.restore();
   }

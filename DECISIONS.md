@@ -117,3 +117,19 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   binding a second local player's own emote buttons in Local 2P mode is a scope cut,
   not built — minor, since taunting mainly matters for the online "dawg on each other"
   use case, which is fully wired.
+- Quick-lines menu: long-press any taunt button (450ms) to open an 8-line preset popup
+  (no free text, per spec). Generalized the taunt wire format to {t:'emote', kind, value}
+  so emoji taps and text lines share one sync path and one bubble-drawing function
+  (auto-sized for text, clamped to stay on-canvas near the walls).
+- Announcer callouts (ACE/DENIED/ON FIRE/COOKING/SKUNKED/COMEBACK/LONG RALLY): new
+  announcer.js tracks win-streaks and per-set max-deficit from the match state the sim
+  already produces (score/server/rallyHits before each point), never writing back to
+  sim state. Wired through gameEvents.js's processEvents, which now optionally takes a
+  `matchBefore` snapshot captured right before step()/online.tick() runs.
+- **Scope note**: the announcer only gets full fidelity (ACE/LONG RALLY specifically,
+  which need `rallyHits`) for the side actually running the real sim — offline modes and
+  the online host. The online guest's state comes from a compact snapshot that never
+  carried `rallyHits` (snapshot didn't need it for gameplay), so a guest's banner will
+  show streak/comeback/skunked callouts but not ace/long-rally ones. Not a crash, just a
+  quieter banner on that side — documented rather than adding a new snapshot field this
+  late for a flavor feature.

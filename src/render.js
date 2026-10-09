@@ -163,7 +163,20 @@ export function drawScore(ctx, match) {
   ctx.fillText(`sets ${match.sets[0]} - ${match.sets[1]}`, WIDTH / 2, 62);
 }
 
-export function render(ctx, state, spin, timeSec = 0, emotes = null) {
+function drawBanner(ctx, text) {
+  if (!text) return;
+  ctx.save();
+  ctx.font = 'bold 34px system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.strokeStyle = PALETTE.outline;
+  ctx.lineWidth = 5;
+  ctx.strokeText(text, WIDTH / 2, 110);
+  ctx.fillStyle = PALETTE.chargeMid;
+  ctx.fillText(text, WIDTH / 2, 110);
+  ctx.restore();
+}
+
+export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null) {
   if (!bgCanvas) buildBackground();
   ctx.drawImage(bgCanvas, 0, 0);
   drawClouds(ctx, timeSec);
@@ -180,4 +193,5 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null) {
     drawEmoteBubble(ctx, p2, emotes[1]);
   }
   drawScore(ctx, state.match);
+  drawBanner(ctx, banner);
 }
