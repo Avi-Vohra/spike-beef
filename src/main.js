@@ -10,7 +10,9 @@ import {
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
-import { acquireWakeLock, releaseWakeLock, vibrate, getStoredName, setStoredName } from './device.js';
+import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName } from './device.js';
+import { unlockAudio, isMuted, setMuted } from './audio.js';
+import { processEvents } from './gameEvents.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -38,18 +40,8 @@ const touch = createTouchInput();
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-function processEvents(events, ball) {
-  for (const ev of events) {
-    const type = typeof ev === 'string' ? ev : ev.type;
-    if (type === 'tip') { fx.spawnImpact(ball.x, ball.y, 300); vibrate(10); }
-    else if (type === 'hit') { fx.spawnImpact(ball.x, ball.y, 480); vibrate(15); }
-    else if (type === 'spike') { fx.spawnImpact(ball.x, ball.y, 750); vibrate(25); }
-    else if (type === 'fumble') { fx.spawnImpact(ball.x, ball.y, 150); }
-    else if (type === 'netBounce') { fx.spawnImpact(ball.x, ball.y, 200); }
-    else if (type === 'point') { fx.spawnSandPuff(ball.x, ball.y); vibrate(30); }
-    else if (type === 'setWon') { fx.spawnConfetti(ball.x, Math.min(ball.y, 200)); }
-  }
-}
+window.addEventListener('pointerdown', unlockAudio, { once: true });
+window.addEventListener('keydown', unlockAudio, { once: true });
 
 let appScreen = 'menu';
 let state = null;
@@ -75,6 +67,8 @@ function goMenu() {
     onCpu: startVsCpu,
     onOnline: goOnlineMenu,
     onHowToPlay: () => { appScreen = 'howToPlay'; renderHowToPlay(overlay, { onBack: goMenu }); },
+    muted: isMuted(),
+    onToggleMute: () => { setMuted(!isMuted()); goMenu(); },
   });
 }
 

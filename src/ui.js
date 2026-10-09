@@ -13,7 +13,7 @@ function clear(root) {
   root.innerHTML = '';
 }
 
-export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu, onOnline }) {
+export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu, onOnline, muted, onToggleMute }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
@@ -28,13 +28,15 @@ export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu, onOnline }) {
   const cpuHard = button('vs CPU: Hard', true);
   const local = button('Local 2P (same keyboard)', true);
   const howTo = button('How to Play', true);
+  const mute = button(muted ? 'Sound: Off' : 'Sound: On', true);
   online.addEventListener('click', onOnline);
   cpuEasy.addEventListener('click', () => onCpu('easy'));
   cpuMedium.addEventListener('click', () => onCpu('medium'));
   cpuHard.addEventListener('click', () => onCpu('hard'));
   local.addEventListener('click', onLocal2P);
   howTo.addEventListener('click', onHowToPlay);
-  [online, cpuEasy, cpuMedium, cpuHard, local, howTo].forEach((b) => panel.appendChild(b));
+  mute.addEventListener('click', onToggleMute);
+  [online, cpuEasy, cpuMedium, cpuHard, local, howTo, mute].forEach((b) => panel.appendChild(b));
   root.appendChild(panel);
 }
 
