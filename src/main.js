@@ -10,7 +10,7 @@ import {
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
-import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName, shareUrl } from './device.js';
+import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName, shareUrl, getH2H, recordH2H } from './device.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { processEvents, updateBanner, bannerState, resetAnnouncer } from './gameEvents.js';
 import { initTauntBar, setTauntBarVisible, update as updateTaunts, emoteState, receiveRemote } from './taunts.js';
@@ -91,6 +91,7 @@ function renderLobbyScreen() {
     localName: lobbyState.localName,
     remoteName: lobbyState.remoteName,
     localReady: lobbyState.localReady,
+    h2h: getH2H(lobbyState.remoteName),
     onReady: () => {
       lobbyState.localReady = true;
       onlineHandle.sendReady();
@@ -185,6 +186,7 @@ function onMatchEnd() {
   const wasOnline = !!online;
   const winnerSide = state.match.sets[0] > state.match.sets[1] ? 0 : 1;
   const titles = [0, 1].map((s) => stats.pickTitle(s === winnerSide, s));
+  if (wasOnline && lobbyState) recordH2H(lobbyState.remoteName, winnerSide === (online.isHost ? 0 : 1));
   renderMatchEnd(overlay, state.match, {
     stats: stats.get(),
     titles,
@@ -220,9 +222,8 @@ window.addEventListener('keydown', (e) => {
 const roomFromLink = new URLSearchParams(location.search).get('room');
 if (roomFromLink && /^[A-Za-z]{4}$/.test(roomFromLink)) {
   const code = roomFromLink.toUpperCase();
-  if (getStoredName()) {
-    joinRoom(code);
-  } else {
+  if (getStoredName()) joinRoom(code);
+  else {
     appScreen = 'nameEntry';
     renderNameEntry(overlay, { initial: '', onSubmit: (n) => { setStoredName(n); joinRoom(code); }, onBack: goMenu });
   }

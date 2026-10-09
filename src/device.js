@@ -29,6 +29,25 @@ export function setStoredName(name) {
   try { localStorage.setItem(NAME_KEY, name); } catch { /* unavailable — just won't persist */ }
 }
 
+const H2H_KEY = 'spikebeef.h2h';
+
+function loadH2H() {
+  try { return JSON.parse(localStorage.getItem(H2H_KEY) || '{}'); } catch { return {}; }
+}
+
+export function getH2H(opponentName) {
+  const all = loadH2H();
+  return all[opponentName] || { wins: 0, losses: 0 };
+}
+
+export function recordH2H(opponentName, won) {
+  const all = loadH2H();
+  const rec = all[opponentName] || { wins: 0, losses: 0 };
+  if (won) rec.wins += 1; else rec.losses += 1;
+  all[opponentName] = rec;
+  try { localStorage.setItem(H2H_KEY, JSON.stringify(all)); } catch { /* unavailable */ }
+}
+
 export function shareUrl(title, url) {
   if (navigator.share) {
     navigator.share({ title, url }).catch(() => {});

@@ -135,7 +135,7 @@ export function renderNameEntry(root, { initial, onSubmit, onBack }) {
   root.appendChild(panel);
 }
 
-export function renderLobby(root, { localName, remoteName, localReady, remoteReady, onReady, onCancel }) {
+export function renderLobby(root, { localName, remoteName, localReady, remoteReady, onReady, onCancel, h2h }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
@@ -145,12 +145,18 @@ export function renderLobby(root, { localName, remoteName, localReady, remoteRea
   const names = document.createElement('p');
   names.className = 'sb-text';
   names.textContent = `${localName} ${localReady ? '(ready)' : ''}  vs  ${remoteName || '...'} ${remoteName && remoteReady ? '(ready)' : ''}`;
+  panel.appendChild(title);
+  panel.appendChild(names);
+  if (remoteName && h2h) {
+    const record = document.createElement('p');
+    record.className = 'sb-text';
+    record.textContent = `You ${h2h.wins} - ${h2h.losses} vs ${remoteName}`;
+    panel.appendChild(record);
+  }
   const ready = button(localReady ? 'Waiting for opponent...' : 'Ready', !localReady);
   const cancel = button('Cancel');
   if (!localReady) ready.addEventListener('click', onReady);
   cancel.addEventListener('click', onCancel);
-  panel.appendChild(title);
-  panel.appendChild(names);
   panel.appendChild(ready);
   panel.appendChild(cancel);
   root.appendChild(panel);

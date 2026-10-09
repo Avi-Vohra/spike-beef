@@ -25,7 +25,7 @@ with whatever time remains.
 [x] Announcer callouts and streaks
 [x] Character reactions and faces
 [x] End cards, stats, slow-motion final point replay
-[ ] Head-to-head record
+[x] Head-to-head record
 
 ## Tier 4, graphics and feel
 [~] Full beach background with parallax, pre-rendered — clouds parallax in, sea is still static (not a wave layer)

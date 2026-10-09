@@ -157,3 +157,10 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   exposes a small playback controller (startPlayback/updatePlayback/playbackDone) that
   main.js drives through a 'replay' appScreen before showing the match-end overlay —
   slow motion via a fixed slowdown factor, not a timestep change to the real sim.
+- Head-to-head record (last Tier 3 item): device.js stores a {opponentName: {wins,
+  losses}} map in localStorage, updated on online match end only (local2p/CPU have no
+  persistent named opponent to key off of) and shown in the lobby as "You W - L vs
+  Name". Determining "did I win" needed care: compares the match's winning WORLD side
+  against which world side THIS client is (host=0, guest=1), not against display
+  index — same host/guest asymmetry the taunt-stats bug earlier was about, applied
+  correctly here from the start.

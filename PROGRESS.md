@@ -40,11 +40,12 @@ over your character, synced online over the SAME transport channel as game
 packets (taunts are tagged objects, game packets are plain arrays, so the
 two protocols can't collide — verified with a direct transport-level test,
 not just read-through).
-Tier 3 nearly done: quick-lines menu, announcer callouts/streaks, character
-reactions/faces, and end cards with stats + slow-motion final-point replay
-are all in. Only "head-to-head record" (localStorage W-L vs a name, shown in
-lobby) remains in Tier 3.
-Next: head-to-head record, then Tier 2's reconnect/forfeit, or Tier 4/5.
+TIER 3 FULLY COMPLETE. All 6 items done: emote taunts, quick-lines menu,
+announcer callouts/streaks, character reactions/faces, end cards with
+stats + slow-motion replay, and head-to-head record (localStorage,
+online matches only, shown in lobby). Deep audit #5 done, tagged stable-5.
+Next: Tier 2's remaining item (ping indicator, reconnect, forfeit,
+rematch), or Tier 4/5 polish — whichever's asked for.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).
