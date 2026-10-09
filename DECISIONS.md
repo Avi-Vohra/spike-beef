@@ -27,8 +27,8 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   produces a weak default deflect ('fumble') — real cost for bad timing.
 - Lowered GRAVITY 1500->1150 and retuned JUMP_VY/MOVE_SPEED for longer, more readable
   ball hang time — direct fix for "points finish so fast, no time to respond."
-- Added `predictLandingPoint` (shared by ai.js and, next, the render-side landing marker)
-  so the AI's targeting and the on-screen landing cue are always the same math.
+- Added `predictLandingPoint` (shared by ai.js and the render-side landing marker) so
+  the AI's targeting and the on-screen landing cue are always the same math.
 - Added small seeded jitter (`resolveBallBounds`' optional rngSeed/nextRandomFn params) on
   net/wall bounces only (never direct hits) for the "a little luck" the user asked for,
   without touching skill-driven contact outcomes.
@@ -73,30 +73,47 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   explicitly asked for and hadn't been touched yet.
 
 ## Visual redesign (same session, immediately after the mechanics work above)
-- Rebuilt `drawPlayer` in render.js with an actual limbed figure (torso/arms/legs/head)
-  instead of a circle-with-headband blob, animated from state that already existed on
-  the player object (`runPhase` for a leg-cycle walk animation, `charging`/`charge` for a
-  windup pose, `lastEvent`/`lastEventTimer` for a swing-through animation on hit/spike/
-  tip/fumble) — no new physics state needed, just consuming what charge-and-release
-  already tracks.
+- Rebuilt `drawPlayer` (now in character.js) with an actual limbed figure
+  (torso/arms/legs/head) instead of a circle-with-headband blob, animated from state that
+  already existed on the player object (`runPhase` for a leg-cycle walk animation,
+  `charging`/`charge` for a windup pose, `lastEvent`/`lastEventTimer` for a swing-through
+  animation on hit/spike/tip/fumble) — no new physics state needed.
 - Added a charge meter (fills + ramps green->yellow->red) directly above the charging
   player's head — the primary "how do I know when to hit" telegraph the original
   complaint was about.
 - Added a landing-point marker (pulsing ring on the sand) using the same
-  `predictLandingPoint` the AI already uses for targeting — one function, two consumers,
-  so the visual cue and the AI's actual aim can never disagree.
+  `predictLandingPoint` the AI already uses for targeting.
 - Added src/fx.js: a small, capped (150 particles max) screen-shake + particle-burst
   system, entirely separate from sim state — impact bursts scaled by hit power, sand
-  puffs on points, confetti on set wins. Driven by the same `events` array netcode/sim
-  already emit, so it costs no new event plumbing.
-- Added a ball motion trail (speed-line gradient) that only appears above a speed
-  threshold, and a subtle moving-cloud parallax layer + a slightly trapezoidal sand
-  shape for a cheap forced-perspective "more 3D" read — no change to the underlying 2D
-  sim, exactly as scoped with the user upfront.
-- Extracted src/device.js (wake lock, vibration, stored name — no game-state deps) out of
-  main.js, which had grown to 317 lines (over the project's 300-line file guideline);
-  now 294.
-- Not done, by explicit scope cut communicated to the user: no camera zoom/hit-stop
-  (simulation freeze on impact), no event-based WebAudio sound set, no accessibility
-  motion-reduction settings. These are real items from the redesign brief that didn't fit
-  in the remaining session time; logged here rather than silently dropped.
+  puffs on points, confetti on set wins.
+- Added a ball motion trail, cloud parallax, and a slightly trapezoidal sand shape for a
+  cheap forced-perspective "more 3D" read — no change to the underlying 2D sim.
+- Extracted src/device.js (wake lock, vibration, stored name) out of main.js (had grown
+  to 317 lines, over the 300-line guideline).
+- Not done at that point, by explicit scope cut: camera zoom/hit-stop, WebAudio sound
+  set, accessibility motion-reduction settings.
+
+## Sound, hit-stop, and taunts (same session, after a live user Q&A pause)
+- Added src/audio.js: a full WebAudio sound set, every sound synthesized (oscillators +
+  one noise burst for spikes), no audio files. Mute preference persisted to localStorage,
+  toggled from the main menu. Unlocked on first pointerdown/keydown (mobile autoplay
+  policy). Extracted src/gameEvents.js (fx + audio + vibrate dispatch) to keep main.js
+  under the file-size cap.
+- Added hit-stop (brief freeze-frame on hard hits/spikes) — **scoped to offline modes
+  only**: pausing an online host's own tick loop would pause the authoritative
+  simulation itself, desyncing the guest. Online play never applies hit-stop.
+- Added the first Tier 3 item: emote taunts (laugh/cry/sleep/flex), shared 2s cooldown,
+  speech bubble over the character, synced online. The sync design: taunts are tagged
+  objects (`{t:'emote', id}`) sent over the SAME transport channel as game-input/snapshot
+  packets (plain arrays) — `netcode.js`'s onMessage now checks `Array.isArray(packet)`
+  before destructuring, routing non-arrays to an optional `onTaunt` callback instead.
+  This was verified with a direct transport-level test (not just read-through): sent a
+  taunt interleaved with real input packets over `LoopbackTransport` and confirmed both
+  the taunt and the game state arrived correctly. Taunts never reach sim.js or affect
+  match state, per spec. Extracted src/taunts.js (bar wiring, cooldown, emote state) and
+  src/character.js (player figure + bubble drawing, pulled out of render.js which had
+  grown past 300 lines) to keep files under the size cap.
+- Local-only modes (Local 2P, vs CPU) show emotes locally (triggered by P1's buttons);
+  binding a second local player's own emote buttons in Local 2P mode is a scope cut,
+  not built — minor, since taunting mainly matters for the online "dawg on each other"
+  use case, which is fully wired.

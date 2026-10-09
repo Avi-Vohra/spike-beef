@@ -20,7 +20,7 @@ with whatever time remains.
 [ ] Ping indicator, reconnect, forfeit, rematch
 
 ## Tier 3, trash talk
-[ ] Emote taunts with bubbles and sounds, synced online
+[x] Emote taunts with bubbles and sounds, synced online
 [ ] Quick lines menu
 [ ] Announcer callouts and streaks
 [ ] Character reactions and faces

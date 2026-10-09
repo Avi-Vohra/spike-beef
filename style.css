@@ -139,6 +139,33 @@ html, body {
 #btn-jump { right: 104px; }
 #btn-hit { right: 18px; }
 
+#taunt-bar {
+  display: none;
+  position: absolute;
+  top: max(10px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  gap: 8px;
+  z-index: 6;
+}
+#taunt-bar.visible {
+  display: flex;
+}
+.taunt-btn {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid rgba(244, 241, 232, 0.85);
+  background: rgba(36, 26, 20, 0.45);
+  font-size: 18px;
+  line-height: 1;
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.taunt-btn:disabled {
+  opacity: 0.35;
+}
+
 #rotate-overlay {
   display: none;
   position: fixed;

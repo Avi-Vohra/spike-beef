@@ -13,6 +13,7 @@ import { hostOnlineMatch, joinOnlineMatch } from './online.js';
 import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName } from './device.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { processEvents } from './gameEvents.js';
+import { initTauntBar, setTauntBarVisible, update as updateTaunts, emoteState, receiveRemote } from './taunts.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -42,6 +43,8 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 
 window.addEventListener('pointerdown', unlockAudio, { once: true });
 window.addEventListener('keydown', unlockAudio, { once: true });
+
+initTauntBar((id) => { if (online) online.sendTaunt(id); });
 
 let appScreen = 'menu';
 let state = null;
@@ -130,6 +133,7 @@ function createRoom() {
     onBothReady: startCountdownThenMatch,
     onError: () => { closeOnline(); goOnlineMenu(); },
     onDisconnected: () => { closeOnline(); goMenu(); },
+    onRemoteTaunt: receiveRemote,
   });
 }
 
@@ -157,6 +161,7 @@ function joinRoom(code) {
     onBothReady: startCountdownThenMatch,
     onError: () => { closeOnline(); goJoinEntry(code, 'Room not found, full, or connection failed.'); },
     onDisconnected: () => { closeOnline(); goMenu(); },
+    onRemoteTaunt: receiveRemote,
   });
 }
 
@@ -278,11 +283,13 @@ function frame(now) {
   }
 
   fx.update(elapsed);
+  updateTaunts(elapsed);
+  setTauntBarVisible(appScreen === 'match');
   if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded')) {
     const shake = fx.getShakeOffset();
     ctx.save();
     ctx.translate(shake.x, shake.y);
-    render(ctx, state, spin, now / 1000);
+    render(ctx, state, spin, now / 1000, emoteState);
     fx.draw(ctx);
     ctx.restore();
   }

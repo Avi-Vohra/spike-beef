@@ -19,20 +19,29 @@ const PHASES = ['serve', 'rally', 'point', 'setWon', 'matchWon'];
 const phaseToCode = (phase) => PHASES.indexOf(phase);
 const codeToPhase = (code) => PHASES[code] ?? 'serve';
 
-export function createHostNetcode(transport, initialState) {
+export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
   let state = initialState;
   let lastAppliedSeq = -1;
   let currentGuestInput = 0;
   let tickCount = 0;
   let pendingEventTypes = [];
 
+  // Taunts share this transport with game-input packets but are tagged
+  // objects, never plain arrays, so the two protocols can never collide —
+  // taunts never reach, or affect, the sim.
   transport.onMessage((packet) => {
+    if (!Array.isArray(packet)) {
+      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.id);
+      return;
+    }
     const [seq, ...inputs] = packet;
     if (seq > lastAppliedSeq) {
       currentGuestInput = inputs[0] || 0;
       lastAppliedSeq = seq;
     }
   });
+
+  function sendTaunt(id) { transport.send({ t: 'emote', id }); }
 
   function tick(hostInput) {
     const result = step(state, hostInput, currentGuestInput);
@@ -57,14 +66,14 @@ export function createHostNetcode(transport, initialState) {
     pendingEventTypes = [];
   }
 
-  return { tick, getState: () => state };
+  return { tick, getState: () => state, sendTaunt };
 }
 
 const HISTORY_CAP = 12;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-export function createGuestNetcode(transport) {
+export function createGuestNetcode(transport, { onTaunt } = {}) {
   let seq = 0;
   const recentInputs = [];
   let lastSnapshot = null;
@@ -77,7 +86,13 @@ export function createGuestNetcode(transport) {
   let localTick = 0;
   let predictedSelf = createPlayer(1);
 
+  function sendTaunt(id) { transport.send({ t: 'emote', id }); }
+
   transport.onMessage((packet) => {
+    if (!Array.isArray(packet)) {
+      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.id);
+      return;
+    }
     const [tick, bx, by, bvx, bvy, p0x, p0y, p1x, p1y, score0, score1, sets0, sets1, server, phaseCode, ackSeq, events] = packet;
     if (tick <= lastProcessedTick) return; // dedupe/out-of-order guard
     lastProcessedTick = tick;
@@ -144,5 +159,5 @@ export function createGuestNetcode(transport) {
     };
   }
 
-  return { tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState };
+  return { tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState, sendTaunt };
 }

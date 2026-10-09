@@ -70,6 +70,7 @@ const SOUND_EVENTS = {
   point: () => { tone(523, 0.1, { type: 'square', gain: 0.15 }); tone(659, 0.12, { type: 'square', gain: 0.15, delay: 0.1 }); },
   setWon: () => { tone(523, 0.12, { gain: 0.2 }); tone(659, 0.12, { gain: 0.2, delay: 0.12 }); tone(784, 0.2, { gain: 0.2, delay: 0.24 }); },
   matchWon: () => { tone(523, 0.14, { gain: 0.22 }); tone(659, 0.14, { gain: 0.22, delay: 0.14 }); tone(784, 0.14, { gain: 0.22, delay: 0.28 }); tone(1047, 0.3, { gain: 0.22, delay: 0.42 }); },
+  emote: () => { tone(880, 0.05, { type: 'triangle', gain: 0.12 }); tone(1100, 0.06, { type: 'triangle', gain: 0.12, delay: 0.05 }); },
 };
 
 export function playEvent(type) {

@@ -33,9 +33,16 @@ cloud parallax, trapezoidal sand for a cheap perspective read. Extracted
 device.js (wake lock/vibrate/name) to keep main.js under 300 lines.
 Not done, scope-cut and documented in DECISIONS.md: hit-stop/camera zoom,
 WebAudio sound set, accessibility motion settings.
-Next: either keep polishing feel (sound would be the highest-impact next
-addition), or resume normal backlog items (Tier 2 reconnect/forfeit, Tier 3
-trash talk) depending on what the user wants to see next.
+Sound + hit-stop added after that (see DECISIONS.md). Session paused for live
+user Q&A, then resumed: Tier 3's first item (emote taunts) is now done —
+4 emoji buttons (laugh/cry/sleep/flex), shared 2s cooldown, speech bubble
+over your character, synced online over the SAME transport channel as game
+packets (taunts are tagged objects, game packets are plain arrays, so the
+two protocols can't collide — verified with a direct transport-level test,
+not just read-through).
+Next: remaining Tier 3 items (quick lines, announcer callouts, character
+reactions, end-card stats, head-to-head record), or Tier 2's reconnect/
+forfeit, depending on what's asked for next.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

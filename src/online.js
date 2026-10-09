@@ -31,17 +31,18 @@ function mirrorState(s) {
   };
 }
 
-function hostController(transport) {
-  const net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff));
+function hostController(transport, onRemoteTaunt) {
+  const net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), { onTaunt: onRemoteTaunt });
   return {
     isHost: true,
     tick(localInput) { return net.tick(localInput); },
     getDisplayState() { return net.getState(); },
+    sendTaunt: net.sendTaunt,
   };
 }
 
-function guestController(transport) {
-  const net = createGuestNetcode(transport);
+function guestController(transport, onRemoteTaunt) {
+  const net = createGuestNetcode(transport, { onTaunt: onRemoteTaunt });
   return {
     isHost: false,
     tick(localInput) { net.tick(swapLeftRight(localInput)); },
@@ -50,6 +51,7 @@ function guestController(transport) {
       if (!r.ball || !r.match) return null;
       return mirrorState({ ball: r.ball, players: [r.opponent, r.self], match: r.match });
     },
+    sendTaunt: net.sendTaunt,
   };
 }
 
@@ -84,14 +86,14 @@ function runLobbyHandshake(transport, localName, { onRemoteName, onBothReady }) 
 // covers bad code, room full, or broker unreachable — see PROMPT.md's KNOWN
 // RISKS: no TURN server means some phone-to-phone pairs across different
 // networks just won't connect.
-export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected }) {
+export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt }) {
   let lobby = null;
   const peerCtrl = createPeerHost(code, {
     onReady(transport) {
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(hostController(transport)),
+        onBothReady: () => onBothReady(hostController(transport, onRemoteTaunt)),
       });
     },
     onError,
@@ -99,14 +101,14 @@ export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, on
   return { close: peerCtrl.close, sendReady: () => lobby && lobby.sendReady() };
 }
 
-export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected }) {
+export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt }) {
   let lobby = null;
   const peerCtrl = createPeerGuest(code, {
     onReady(transport) {
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(guestController(transport)),
+        onBothReady: () => onBothReady(guestController(transport, onRemoteTaunt)),
       });
     },
     onError,
