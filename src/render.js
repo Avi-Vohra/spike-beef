@@ -163,6 +163,32 @@ export function drawScore(ctx, match) {
   ctx.fillText(`sets ${match.sets[0]} - ${match.sets[1]}`, WIDTH / 2, 62);
 }
 
+// Small connection-health dot, top-left — green/yellow/red by how long
+// it's been since anything was heard from the other side. Only drawn when
+// `silentMs` is non-null (i.e. an online match is active).
+function drawConnectionDot(ctx, silentMs) {
+  if (silentMs == null) return;
+  const color = silentMs < 400 ? '#5fd16a' : silentMs < 1500 ? '#f4c842' : '#ff5d5d';
+  ctx.fillStyle = color;
+  ctx.strokeStyle = PALETTE.outline;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.arc(16, 16, 7, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  if (silentMs > 3000) {
+    const secsLeft = Math.max(0, Math.ceil((15000 - silentMs) / 1000));
+    ctx.font = 'bold 20px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#fff';
+    ctx.strokeStyle = PALETTE.outline;
+    ctx.lineWidth = 4;
+    const msg = `Reconnecting... (${secsLeft}s)`;
+    ctx.strokeText(msg, WIDTH / 2, HEIGHT / 2);
+    ctx.fillText(msg, WIDTH / 2, HEIGHT / 2);
+  }
+}
+
 function drawBanner(ctx, text) {
   if (!text) return;
   ctx.save();
@@ -176,7 +202,7 @@ function drawBanner(ctx, text) {
   ctx.restore();
 }
 
-export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null) {
+export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null) {
   if (!bgCanvas) buildBackground();
   ctx.drawImage(bgCanvas, 0, 0);
   drawClouds(ctx, timeSec);
@@ -197,4 +223,5 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   }
   drawScore(ctx, state.match);
   drawBanner(ctx, banner);
+  drawConnectionDot(ctx, silentMs);
 }

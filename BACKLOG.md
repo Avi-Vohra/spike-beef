@@ -17,7 +17,7 @@ with whatever time remains.
 [x] Guest prediction, interpolation, event dedupe; net tests (b) and (c)
 [x] PeerTransport, room codes, share link, join by link, error screens
 [x] Lobby, names, ready, countdown, mirrored guest view
-[ ] Ping indicator, reconnect, forfeit, rematch
+[x] Ping indicator, reconnect, forfeit, rematch
 
 ## Tier 3, trash talk
 [x] Emote taunts with bubbles and sounds, synced online

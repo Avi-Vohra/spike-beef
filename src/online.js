@@ -31,18 +31,24 @@ function mirrorState(s) {
   };
 }
 
-function hostController(transport, onRemoteTaunt) {
-  const net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), { onTaunt: onRemoteTaunt });
+// `callbacks` ({onTaunt, onRematchReady}) are wired in at construction and
+// stay wired across a rematch() — the same raw transport is reused (same
+// room, no re-connecting), just with a fresh netcode instance underneath.
+function hostController(transport, callbacks) {
+  let net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), callbacks);
   return {
     isHost: true,
     tick(localInput) { return net.tick(localInput); },
     getDisplayState() { return net.getState(); },
-    sendTaunt: net.sendTaunt,
+    sendTaunt: (...a) => net.sendTaunt(...a),
+    sendRematchReady: (...a) => net.sendRematchReady(...a),
+    getSilentMs: (...a) => net.getSilentMs(...a),
+    rematch() { net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), callbacks); },
   };
 }
 
-function guestController(transport, onRemoteTaunt) {
-  const net = createGuestNetcode(transport, { onTaunt: onRemoteTaunt });
+function guestController(transport, callbacks) {
+  let net = createGuestNetcode(transport, callbacks);
   return {
     isHost: false,
     tick(localInput) { net.tick(swapLeftRight(localInput)); },
@@ -51,7 +57,10 @@ function guestController(transport, onRemoteTaunt) {
       if (!r.ball || !r.match) return null;
       return mirrorState({ ball: r.ball, players: [r.opponent, r.self], match: r.match });
     },
-    sendTaunt: net.sendTaunt,
+    sendTaunt: (...a) => net.sendTaunt(...a),
+    sendRematchReady: (...a) => net.sendRematchReady(...a),
+    getSilentMs: (...a) => net.getSilentMs(...a),
+    rematch() { net = createGuestNetcode(transport, callbacks); },
   };
 }
 
@@ -85,15 +94,18 @@ function runLobbyHandshake(transport, localName, { onRemoteName, onBothReady }) 
 // have tapped ready, with the match controller ready to drive. onError
 // covers bad code, room full, or broker unreachable — see PROMPT.md's KNOWN
 // RISKS: no TURN server means some phone-to-phone pairs across different
-// networks just won't connect.
-export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt }) {
+// networks just won't connect. onRematchReady fires whenever the OTHER side
+// signals "run it back" — including after the match has ended, since the
+// controller (and its transport.onMessage handler) is still alive then.
+export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady }) {
   let lobby = null;
+  const callbacks = { onTaunt: onRemoteTaunt, onRematchReady };
   const peerCtrl = createPeerHost(code, {
     onReady(transport) {
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(hostController(transport, onRemoteTaunt)),
+        onBothReady: () => onBothReady(hostController(transport, callbacks)),
       });
     },
     onError,
@@ -101,14 +113,15 @@ export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, on
   return { close: peerCtrl.close, sendReady: () => lobby && lobby.sendReady() };
 }
 
-export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt }) {
+export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady }) {
   let lobby = null;
+  const callbacks = { onTaunt: onRemoteTaunt, onRematchReady };
   const peerCtrl = createPeerGuest(code, {
     onReady(transport) {
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(guestController(transport, onRemoteTaunt)),
+        onBothReady: () => onBothReady(guestController(transport, callbacks)),
       });
     },
     onError,

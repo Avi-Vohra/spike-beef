@@ -152,6 +152,39 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   something different depending on whether this client is the host (remote = side 1) or
   the guest (remote = side 0) — caught and fixed a bug where I'd initially hardcoded both
   as side 1.
+- Last Tier 2 item: ping indicator, reconnect, forfeit, rematch.
+  - **Ping indicator scoped down**: rather than a literal timestamp-echo RTT ping/pong,
+    the connection dot (green/yellow/red, top-left during a match) is driven by
+    `getSilentMs()` — time since ANY message (game packet, taunt, anything) was last
+    received. This is a simpler, still-meaningful proxy for "is the connection alive,"
+    and it's the exact same number that drives reconnect/forfeit below, so there's one
+    source of truth instead of two parallel mechanisms.
+  - **Reconnect/forfeit**: both host and guest netcode track `lastMessageTime` (updated
+    on every inbound message, array or tagged object) and expose `getSilentMs(now)`.
+    main.js shows a "Reconnecting... (Ns)" banner once silence passes 3s, and declares
+    the LOCAL player the winner by forfeit once it passes 15s (closes the connection,
+    shows a dedicated forfeit screen). This is symmetric: whichever side goes quiet, the
+    side that's still there wins — matches "leaving mid-match = forfeit, the stayer is
+    told so." I did NOT freeze the local sim/input loop during the reconnecting window
+    (considered it, decided the risk of a half-tested pause/resume interaction wasn't
+    worth it for a scenario — real connection loss — I can't exercise end-to-end myself);
+    the countdown and eventual forfeit are the real behavior, "frozen" is just how it
+    looks in practice once no new data arrives.
+  - **Same-room rematch**: `netcode.js` now also recognizes a `{t:'rematchReady'}`
+    tagged message (same pattern as taunts) and online.js's host/guestController expose
+    a `.rematch()` method that rebuilds the netcode instance ON THE SAME transport — no
+    reconnecting, no new room code. main.js tracks a small `{local, remote}` ready-flag
+    pair and starts the countdown once both sides have tapped "Run it back." Verified
+    the rematchReady signaling directly over LoopbackTransport in both directions, not
+    just read-through.
+  - **main.js file size**: this feature pushed main.js to ~319 lines (over the ~300
+    guideline). Did two real trims (consolidated the two rematch-ready booleans into one
+    object, compacted a couple of statements) but stopped short of extracting the whole
+    online-flow into its own module — that would require sharing `appScreen`/`online`
+    as mutable state across two files (since both main.js's render loop and the
+    online-flow functions read/write them), which is a real refactor I didn't want to
+    do hastily this late with no way to browser-test the result. Noting the overage
+    rather than risking a rushed, unverified split.
 - Replay: replay.js keeps a capped ring buffer of frames recorded only during the
   'rally' phase (so its tail is always live action, never a frozen pause frame), and
   exposes a small playback controller (startPlayback/updatePlayback/playbackDone) that

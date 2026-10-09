@@ -19,19 +19,23 @@ const PHASES = ['serve', 'rally', 'point', 'setWon', 'matchWon'];
 const phaseToCode = (phase) => PHASES.indexOf(phase);
 const codeToPhase = (code) => PHASES[code] ?? 'serve';
 
-export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
+export function createHostNetcode(transport, initialState, { onTaunt, onRematchReady } = {}) {
   let state = initialState;
   let lastAppliedSeq = -1;
   let currentGuestInput = 0;
   let tickCount = 0;
   let pendingEventTypes = [];
+  let lastMessageTime = Date.now();
 
-  // Taunts share this transport with game-input packets but are tagged
-  // objects, never plain arrays, so the two protocols can never collide —
-  // taunts never reach, or affect, the sim.
+  // Taunts (and rematch-ready) share this transport with game-input packets
+  // but are tagged objects, never plain arrays, so the two protocols can
+  // never collide — neither reaches, or affects, the sim.
   transport.onMessage((packet) => {
+    lastMessageTime = Date.now();
     if (!Array.isArray(packet)) {
-      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
+      if (!packet) return;
+      if (packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
+      else if (packet.t === 'rematchReady' && onRematchReady) onRematchReady();
       return;
     }
     const [seq, ...inputs] = packet;
@@ -42,6 +46,8 @@ export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
   });
 
   function sendTaunt(kind, value) { transport.send({ t: 'emote', kind, value }); }
+  function sendRematchReady() { transport.send({ t: 'rematchReady' }); }
+  function getSilentMs(now = Date.now()) { return now - lastMessageTime; }
 
   function tick(hostInput) {
     const result = step(state, hostInput, currentGuestInput);
@@ -66,14 +72,14 @@ export function createHostNetcode(transport, initialState, { onTaunt } = {}) {
     pendingEventTypes = [];
   }
 
-  return { tick, getState: () => state, sendTaunt };
+  return { tick, getState: () => state, sendTaunt, sendRematchReady, getSilentMs };
 }
 
 const HISTORY_CAP = 12;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
-export function createGuestNetcode(transport, { onTaunt } = {}) {
+export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) {
   let seq = 0;
   const recentInputs = [];
   let lastSnapshot = null;
@@ -85,12 +91,18 @@ export function createGuestNetcode(transport, { onTaunt } = {}) {
   const history = []; // recent snapshots, oldest first, for interpolation
   let localTick = 0;
   let predictedSelf = createPlayer(1);
+  let lastMessageTime = Date.now();
 
   function sendTaunt(kind, value) { transport.send({ t: 'emote', kind, value }); }
+  function sendRematchReady() { transport.send({ t: 'rematchReady' }); }
+  function getSilentMs(now = Date.now()) { return now - lastMessageTime; }
 
   transport.onMessage((packet) => {
+    lastMessageTime = Date.now();
     if (!Array.isArray(packet)) {
-      if (packet && packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
+      if (!packet) return;
+      if (packet.t === 'emote' && onTaunt) onTaunt(packet.kind, packet.value);
+      else if (packet.t === 'rematchReady' && onRematchReady) onRematchReady();
       return;
     }
     const [tick, bx, by, bvx, bvy, p0x, p0y, p1x, p1y, score0, score1, sets0, sets1, server, phaseCode, ackSeq, events] = packet;
@@ -159,5 +171,8 @@ export function createGuestNetcode(transport, { onTaunt } = {}) {
     };
   }
 
-  return { tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState, sendTaunt };
+  return {
+    tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState,
+    sendTaunt, sendRematchReady, getSilentMs,
+  };
 }

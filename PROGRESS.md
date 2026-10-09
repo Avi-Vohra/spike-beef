@@ -40,12 +40,16 @@ over your character, synced online over the SAME transport channel as game
 packets (taunts are tagged objects, game packets are plain arrays, so the
 two protocols can't collide — verified with a direct transport-level test,
 not just read-through).
-TIER 3 FULLY COMPLETE. All 6 items done: emote taunts, quick-lines menu,
-announcer callouts/streaks, character reactions/faces, end cards with
-stats + slow-motion replay, and head-to-head record (localStorage,
-online matches only, shown in lobby). Deep audit #5 done, tagged stable-5.
-Next: Tier 2's remaining item (ping indicator, reconnect, forfeit,
-rematch), or Tier 4/5 polish — whichever's asked for.
+TIER 2 AND TIER 3 BOTH FULLY COMPLETE. Tier 2's last item (ping indicator,
+reconnect, forfeit, rematch) is done: connection-health dot driven by
+silentMs, 3s "Reconnecting..." banner, 15s auto-forfeit (whoever's still
+there wins), and a real same-room rematch (reuses the existing transport,
+no new room code) via a netcode-level rematchReady handshake. Verified
+silentMs timing and rematchReady signaling directly over LoopbackTransport.
+main.js is ~319 lines (over the ~300 guideline) — accepted rather than
+risking a hasty untested refactor; reasoning in DECISIONS.md.
+Next: Tier 4 remaining polish (net sway, sea animation, screen
+transitions) or Tier 5 extras — whichever's asked for.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

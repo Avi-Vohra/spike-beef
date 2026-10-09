@@ -5,7 +5,7 @@ import { createKeyboardInput, createTouchInput } from './input.js';
 import {
   renderMenu, renderHowToPlay, renderMatchEnd, renderPause, hideOverlay,
   renderOnlineMenu, renderCreateWaiting, renderJoinEntry, renderConnecting,
-  renderNameEntry, renderLobby, renderCountdown,
+  renderNameEntry, renderLobby, renderCountdown, renderForfeitResult,
 } from './ui.js';
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
@@ -113,6 +113,14 @@ function startCountdownThenMatch(ctrl) {
   }, 700);
 }
 
+const rematchState = { local: false, remote: false };
+function tryStartRematch() {
+  if (!rematchState.local || !rematchState.remote) return;
+  rematchState.local = rematchState.remote = false;
+  online.rematch();
+  startCountdownThenMatch(online);
+}
+
 function createRoom() {
   const code = randomRoomCode();
   const localName = getStoredName() || 'Player';
@@ -127,6 +135,7 @@ function createRoom() {
     onError: () => { closeOnline(); goOnlineMenu(); },
     onDisconnected: () => { closeOnline(); goMenu(); },
     onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(1); },
+    onRematchReady: () => { rematchState.remote = true; tryStartRematch(); },
   });
 }
 
@@ -150,6 +159,7 @@ function joinRoom(code) {
     onError: () => { closeOnline(); goJoinEntry(code, 'Room not found, full, or connection failed.'); },
     onDisconnected: () => { closeOnline(); goMenu(); },
     onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(0); },
+    onRematchReady: () => { rematchState.remote = true; tryStartRematch(); },
   });
 }
 
@@ -190,11 +200,13 @@ function onMatchEnd() {
   renderMatchEnd(overlay, state.match, {
     stats: stats.get(),
     titles,
-    // "Run it back, same room" isn't wired up yet (that's the reconnect/
-    // rematch backlog item) — online rematch just returns to the menu for now.
     onRematch: () => {
-      if (wasOnline) { closeOnline(); goMenu(); }
-      else if (rematchDifficulty) startVsCpu(rematchDifficulty);
+      if (wasOnline) {
+        rematchState.local = true;
+        online.sendRematchReady();
+        renderConnecting(overlay, 'Waiting for opponent to rematch...', { onCancel: () => { closeOnline(); goMenu(); } });
+        tryStartRematch();
+      } else if (rematchDifficulty) startVsCpu(rematchDifficulty);
       else startLocal2P();
     },
     onMenu: () => { closeOnline(); goMenu(); },
@@ -263,6 +275,12 @@ function frame(now) {
         if (state.match.phase === 'matchWon') { enterReplay(); break; }
       }
     }
+    if (appScreen === 'match' && online.getSilentMs() >= 15000) {
+      releaseWakeLock();
+      closeOnline();
+      appScreen = 'forfeitResult';
+      renderForfeitResult(overlay, { won: true, onMenu: goMenu });
+    }
   } else if (appScreen === 'match' && state) {
     acc += elapsed;
     while (acc >= DT) {
@@ -288,11 +306,11 @@ function frame(now) {
   updateTaunts(elapsed);
   updateBanner(elapsed);
   setTauntBarVisible(appScreen === 'match');
-  if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded' || appScreen === 'replay')) {
+  if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded' || appScreen === 'replay' || appScreen === 'forfeitResult')) {
     const shake = fx.getShakeOffset();
     ctx.save();
     ctx.translate(shake.x, shake.y);
-    render(ctx, state, spin, now / 1000, emoteState, bannerState.text);
+    render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null);
     fx.draw(ctx);
     ctx.restore();
   }

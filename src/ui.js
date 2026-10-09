@@ -275,6 +275,24 @@ export function renderPause(root, { onResume, onQuit }) {
   root.appendChild(panel);
 }
 
+export function renderForfeitResult(root, { won, reason, onMenu }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = won ? 'You win by forfeit!' : 'You forfeited.';
+  const text = document.createElement('p');
+  text.className = 'sb-text';
+  text.textContent = reason || (won ? 'Your opponent disconnected.' : 'You left the match.');
+  const menu = button('Menu');
+  menu.addEventListener('click', onMenu);
+  panel.appendChild(title);
+  panel.appendChild(text);
+  panel.appendChild(menu);
+  root.appendChild(panel);
+}
+
 export function hideOverlay(root) {
   clear(root);
 }
