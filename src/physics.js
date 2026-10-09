@@ -270,7 +270,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     ball.vy = -power * DEFAULT_STEEP * 0.6;
   }
 
-  events.push(eventType);
+  events.push({ type: eventType, side: p.side });
   p.lastEvent = eventType;
   p.lastEventTimer = 0.35;
   p.hitCooldown = HIT_COOLDOWN;

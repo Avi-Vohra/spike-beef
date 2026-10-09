@@ -10,10 +10,12 @@ import {
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
-import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName } from './device.js';
+import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName, shareUrl } from './device.js';
 import { unlockAudio, isMuted, setMuted } from './audio.js';
 import { processEvents, updateBanner, bannerState, resetAnnouncer } from './gameEvents.js';
 import { initTauntBar, setTauntBarVisible, update as updateTaunts, emoteState, receiveRemote } from './taunts.js';
+import * as stats from './stats.js';
+import { record, reset as resetReplay, hasFinalPoint, startPlayback, updatePlayback, playbackDone } from './replay.js';
 import { setupCanvasScaling } from './canvasScale.js';
 
 const canvas = document.getElementById('game');
@@ -29,17 +31,19 @@ const touch = createTouchInput();
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-window.addEventListener('pointerdown', unlockAudio, { once: true });
-window.addEventListener('keydown', unlockAudio, { once: true });
+['pointerdown', 'keydown'].forEach((evt) => window.addEventListener(evt, unlockAudio, { once: true }));
 
-initTauntBar((kind, value) => { if (online) online.sendTaunt(kind, value); });
+initTauntBar((kind, value) => {
+  if (online) online.sendTaunt(kind, value);
+  stats.recordTaunt(online && !online.isHost ? 1 : 0);
+});
 
 let appScreen = 'menu';
 let state = null;
 let spin = 0;
 let cpu = null; // non-null when P2 is CPU-controlled
 let online = null; // non-null controller once an online match is connected
-let onlineHandle = null; // {close()} for an in-flight or active online session
+let onlineHandle = null; // {close()} for an in-flight/active online session
 
 function closeOnline() {
   if (onlineHandle) onlineHandle.close();
@@ -121,17 +125,12 @@ function createRoom() {
     onBothReady: startCountdownThenMatch,
     onError: () => { closeOnline(); goOnlineMenu(); },
     onDisconnected: () => { closeOnline(); goMenu(); },
-    onRemoteTaunt: receiveRemote,
+    onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(1); },
   });
 }
 
 function shareRoomLink(code) {
-  const url = `${location.origin}${location.pathname}?room=${code}`;
-  if (navigator.share) {
-    navigator.share({ title: 'Spike Beef', url }).catch(() => {});
-  } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(url).catch(() => {});
-  }
+  shareUrl('Spike Beef', `${location.origin}${location.pathname}?room=${code}`);
 }
 
 function goJoinEntry(prefillCode = '', error = '') {
@@ -149,41 +148,46 @@ function joinRoom(code) {
     onBothReady: startCountdownThenMatch,
     onError: () => { closeOnline(); goJoinEntry(code, 'Room not found, full, or connection failed.'); },
     onDisconnected: () => { closeOnline(); goMenu(); },
-    onRemoteTaunt: receiveRemote,
+    onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(0); },
   });
 }
 
-function startOnlineMatch() {
-  cpu = null;
+function enterMatch() {
   appScreen = 'match';
   hideOverlay(overlay);
   acquireWakeLock();
   resetAnnouncer();
+  resetReplay();
 }
+
+function enterReplay() {
+  if (hasFinalPoint()) { startPlayback(); appScreen = 'replay'; }
+  else { appScreen = 'matchEnded'; onMatchEnd(); }
+}
+
+function startOnlineMatch() { cpu = null; enterMatch(); }
 
 function startLocal2P() {
   cpu = null;
   state = createInitialState(Date.now() & 0xffffffff);
-  appScreen = 'match';
-  hideOverlay(overlay);
-  acquireWakeLock();
-  resetAnnouncer();
+  enterMatch();
 }
 
 function startVsCpu(difficulty) {
   cpu = createAi(1, difficulty);
   state = createInitialState(Date.now() & 0xffffffff);
-  appScreen = 'match';
-  hideOverlay(overlay);
-  acquireWakeLock();
-  resetAnnouncer();
+  enterMatch();
 }
 
 function onMatchEnd() {
   releaseWakeLock();
   const rematchDifficulty = cpu ? cpu.difficulty : null;
   const wasOnline = !!online;
+  const winnerSide = state.match.sets[0] > state.match.sets[1] ? 0 : 1;
+  const titles = [0, 1].map((s) => stats.pickTitle(s === winnerSide, s));
   renderMatchEnd(overlay, state.match, {
+    stats: stats.get(),
+    titles,
     // "Run it back, same room" isn't wired up yet (that's the reconnect/
     // rematch backlog item) — online rematch just returns to the menu for now.
     onRematch: () => {
@@ -249,16 +253,13 @@ function frame(now) {
       const display = online.getDisplayState();
       if (display) {
         state = display;
+        record(state);
         spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
         if (result && matchBefore) {
           matchBefore.setsAfter = state.match.sets;
           processEvents(result.events, state.ball, matchBefore);
         }
-        if (state.match.phase === 'matchWon') {
-          appScreen = 'matchEnded';
-          onMatchEnd();
-          break;
-        }
+        if (state.match.phase === 'matchWon') { enterReplay(); break; }
       }
     }
   } else if (appScreen === 'match' && state) {
@@ -269,23 +270,24 @@ function frame(now) {
       const input2 = cpu ? cpu.getInput(state) : keyboard.getP2();
       const result = step(state, input1, input2);
       state = result.state;
+      record(state);
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
       matchBefore.setsAfter = state.match.sets;
       hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball, matchBefore));
-      if (state.match.phase === 'matchWon') {
-        appScreen = 'matchEnded';
-        onMatchEnd();
-        break;
-      }
+      if (state.match.phase === 'matchWon') { enterReplay(); break; }
     }
+  } else if (appScreen === 'replay') {
+    const replayFrame = updatePlayback(elapsed);
+    if (replayFrame) state = replayFrame;
+    if (playbackDone()) { appScreen = 'matchEnded'; onMatchEnd(); }
   }
 
   fx.update(elapsed);
   updateTaunts(elapsed);
   updateBanner(elapsed);
   setTauntBarVisible(appScreen === 'match');
-  if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded')) {
+  if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded' || appScreen === 'replay')) {
     const shake = fx.getShakeOffset();
     ctx.save();
     ctx.translate(shake.x, shake.y);

@@ -40,9 +40,11 @@ over your character, synced online over the SAME transport channel as game
 packets (taunts are tagged objects, game packets are plain arrays, so the
 two protocols can't collide — verified with a direct transport-level test,
 not just read-through).
-Next: remaining Tier 3 items (quick lines, announcer callouts, character
-reactions, end-card stats, head-to-head record), or Tier 2's reconnect/
-forfeit, depending on what's asked for next.
+Tier 3 nearly done: quick-lines menu, announcer callouts/streaks, character
+reactions/faces, and end cards with stats + slow-motion final-point replay
+are all in. Only "head-to-head record" (localStorage W-L vs a name, shown in
+lobby) remains in Tier 3.
+Next: head-to-head record, then Tier 2's reconnect/forfeit, or Tier 4/5.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

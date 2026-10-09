@@ -28,3 +28,11 @@ export function getStoredName() {
 export function setStoredName(name) {
   try { localStorage.setItem(NAME_KEY, name); } catch { /* unavailable — just won't persist */ }
 }
+
+export function shareUrl(title, url) {
+  if (navigator.share) {
+    navigator.share({ title, url }).catch(() => {});
+  } else if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).catch(() => {});
+  }
+}

@@ -209,23 +209,44 @@ export function renderHowToPlay(root, { onBack }) {
   root.appendChild(panel);
 }
 
-export function renderMatchEnd(root, match, { onRematch, onMenu }) {
+export function renderMatchEnd(root, match, { onRematch, onMenu, stats, titles }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
-  const winner = match.sets[0] > match.sets[1] ? 'P1' : 'P2';
+  const winnerSide = match.sets[0] > match.sets[1] ? 0 : 1;
+  const winnerLabel = winnerSide === 0 ? 'P1' : 'P2';
   const title = document.createElement('h2');
   title.className = 'sb-title';
-  title.textContent = `${winner} wins the match!`;
+  title.textContent = `${winnerLabel} wins the match!`;
   const sets = document.createElement('p');
   sets.className = 'sb-text';
   sets.textContent = `Sets: ${match.sets[0]} - ${match.sets[1]}`;
+  panel.appendChild(title);
+  panel.appendChild(sets);
+
+  if (titles) {
+    const cards = document.createElement('p');
+    cards.className = 'sb-text';
+    cards.innerHTML = `<b>P1</b>: "${titles[0]}" &nbsp; <b>P2</b>: "${titles[1]}"`;
+    panel.appendChild(cards);
+  }
+  if (stats) {
+    const statsText = document.createElement('p');
+    statsText.className = 'sb-text';
+    statsText.style.fontSize = '12px';
+    statsText.innerHTML = [
+      `Spikes: ${stats.spikes[0]} - ${stats.spikes[1]}`,
+      `Aces: ${stats.aces[0]} - ${stats.aces[1]}`,
+      `Longest rally: ${stats.longestRally} hits`,
+      `Taunts sent: ${stats.tauntsSent[0]} - ${stats.tauntsSent[1]}`,
+    ].join('<br/>');
+    panel.appendChild(statsText);
+  }
+
   const rematch = button('Run it back');
   const menu = button('Menu');
   rematch.addEventListener('click', onRematch);
   menu.addEventListener('click', onMenu);
-  panel.appendChild(title);
-  panel.appendChild(sets);
   panel.appendChild(rematch);
   panel.appendChild(menu);
   root.appendChild(panel);

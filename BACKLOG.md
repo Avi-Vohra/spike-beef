@@ -24,7 +24,7 @@ with whatever time remains.
 [x] Quick lines menu
 [x] Announcer callouts and streaks
 [x] Character reactions and faces
-[ ] End cards, stats, slow-motion final point replay
+[x] End cards, stats, slow-motion final point replay
 [ ] Head-to-head record
 
 ## Tier 4, graphics and feel

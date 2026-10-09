@@ -142,3 +142,18 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   ahead by 4+, a sweat drop when behind by 4+ — computed in render.js from
   `state.match.score` and passed down as a `mood` param, independent of the win/lose
   pose so they don't fight each other.
+- End cards/stats/replay: new stats.js tracks spikes/aces/taunts per world-side plus the
+  match's longest rally, fed from the same event stream gameEvents.js already processes
+  (spike events are now tagged `{type,side}` — physics.js's resolvePlayerHit pushes an
+  object instead of a bare string; every consumer already handled both shapes via the
+  existing `typeof ev === 'string' ? ev : ev.type` pattern, so this was a safe, verified
+  extension, not a silent format change). Title cards (`stats.pickTitle`) pick flavor
+  text from those stats. Taunt-side bookkeeping required care: a "remote" taunt means
+  something different depending on whether this client is the host (remote = side 1) or
+  the guest (remote = side 0) — caught and fixed a bug where I'd initially hardcoded both
+  as side 1.
+- Replay: replay.js keeps a capped ring buffer of frames recorded only during the
+  'rally' phase (so its tail is always live action, never a frozen pause frame), and
+  exposes a small playback controller (startPlayback/updatePlayback/playbackDone) that
+  main.js drives through a 'replay' appScreen before showing the match-end overlay —
+  slow motion via a fixed slowdown factor, not a timestep change to the real sim.
