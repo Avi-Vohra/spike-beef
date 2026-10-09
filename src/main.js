@@ -233,12 +233,15 @@ if (roomFromLink && /^[A-Za-z]{4}$/.test(roomFromLink)) {
 const DT = 1 / 60;
 let acc = 0;
 let last = performance.now();
+let hitStopTimer = 0; // offline-only: freezing an authoritative online host would desync the guest
 
 function frame(now) {
   const elapsed = Math.min((now - last) / 1000, 0.25);
   last = now;
 
-  if (appScreen === 'match' && online) {
+  if (hitStopTimer > 0) {
+    hitStopTimer -= elapsed;
+  } else if (appScreen === 'match' && online) {
     acc += elapsed;
     while (acc >= DT) {
       const localInput = keyboard.getP1() | touch.getMask();
@@ -265,7 +268,7 @@ function frame(now) {
       state = result.state;
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
-      processEvents(result.events, state.ball);
+      hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball));
       if (state.match.phase === 'matchWon') {
         appScreen = 'matchEnded';
         onMatchEnd();
