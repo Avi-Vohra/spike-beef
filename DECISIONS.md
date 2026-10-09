@@ -71,3 +71,32 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   though short of the plan's original 6-12 hit aspiration; logged as a further-tuning
   opportunity rather than blocking the visual redesign work, which the user also
   explicitly asked for and hadn't been touched yet.
+
+## Visual redesign (same session, immediately after the mechanics work above)
+- Rebuilt `drawPlayer` in render.js with an actual limbed figure (torso/arms/legs/head)
+  instead of a circle-with-headband blob, animated from state that already existed on
+  the player object (`runPhase` for a leg-cycle walk animation, `charging`/`charge` for a
+  windup pose, `lastEvent`/`lastEventTimer` for a swing-through animation on hit/spike/
+  tip/fumble) — no new physics state needed, just consuming what charge-and-release
+  already tracks.
+- Added a charge meter (fills + ramps green->yellow->red) directly above the charging
+  player's head — the primary "how do I know when to hit" telegraph the original
+  complaint was about.
+- Added a landing-point marker (pulsing ring on the sand) using the same
+  `predictLandingPoint` the AI already uses for targeting — one function, two consumers,
+  so the visual cue and the AI's actual aim can never disagree.
+- Added src/fx.js: a small, capped (150 particles max) screen-shake + particle-burst
+  system, entirely separate from sim state — impact bursts scaled by hit power, sand
+  puffs on points, confetti on set wins. Driven by the same `events` array netcode/sim
+  already emit, so it costs no new event plumbing.
+- Added a ball motion trail (speed-line gradient) that only appears above a speed
+  threshold, and a subtle moving-cloud parallax layer + a slightly trapezoidal sand
+  shape for a cheap forced-perspective "more 3D" read — no change to the underlying 2D
+  sim, exactly as scoped with the user upfront.
+- Extracted src/device.js (wake lock, vibration, stored name — no game-state deps) out of
+  main.js, which had grown to 317 lines (over the project's 300-line file guideline);
+  now 294.
+- Not done, by explicit scope cut communicated to the user: no camera zoom/hit-stop
+  (simulation freeze on impact), no event-based WebAudio sound set, no accessibility
+  motion-reduction settings. These are real items from the redesign brief that didn't fit
+  in the remaining session time; logged here rather than silently dropped.

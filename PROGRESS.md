@@ -26,8 +26,16 @@ seeded luck on bounces. Rally length improved (~0 -> ~3.4 avg hits); CPU-vs-
 CPU win-share balance is a known, investigated, documented rough edge
 (DECISIONS.md) deprioritized in favor of the visual redesign — not yet
 touched and explicitly requested.
-Next: visual redesign — limbed characters, charge meter, landing marker,
-impact effects (screen shake, hit-stop, particles), per the approved plan.
+VISUAL REDESIGN DONE (this session): limbed characters with run/charge/swing
+animation, charge meter above head, landing-point marker, fx.js (screen
+shake + capped particle bursts: impact/sand-puff/confetti), ball speed trail,
+cloud parallax, trapezoidal sand for a cheap perspective read. Extracted
+device.js (wake lock/vibrate/name) to keep main.js under 300 lines.
+Not done, scope-cut and documented in DECISIONS.md: hit-stop/camera zoom,
+WebAudio sound set, accessibility motion settings.
+Next: either keep polishing feel (sound would be the highest-impact next
+addition), or resume normal backlog items (Tier 2 reconnect/forfeit, Tier 3
+trash talk) depending on what the user wants to see next.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

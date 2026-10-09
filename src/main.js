@@ -1,5 +1,6 @@
 import { createInitialState, step } from './sim.js';
 import { render } from './render.js';
+import * as fx from './fx.js';
 import { createKeyboardInput, createTouchInput } from './input.js';
 import {
   renderMenu, renderHowToPlay, renderMatchEnd, renderPause, hideOverlay,
@@ -9,6 +10,7 @@ import {
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
+import { acquireWakeLock, releaseWakeLock, vibrate, getStoredName, setStoredName } from './device.js';
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -36,28 +38,17 @@ const touch = createTouchInput();
 document.addEventListener('touchmove', (e) => e.preventDefault(), { passive: false });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
-let wakeLock = null;
-async function acquireWakeLock() {
-  try {
-    if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
-  } catch {
-    // Wake Lock isn't available everywhere — fine to silently skip.
+function processEvents(events, ball) {
+  for (const ev of events) {
+    const type = typeof ev === 'string' ? ev : ev.type;
+    if (type === 'tip') { fx.spawnImpact(ball.x, ball.y, 300); vibrate(10); }
+    else if (type === 'hit') { fx.spawnImpact(ball.x, ball.y, 480); vibrate(15); }
+    else if (type === 'spike') { fx.spawnImpact(ball.x, ball.y, 750); vibrate(25); }
+    else if (type === 'fumble') { fx.spawnImpact(ball.x, ball.y, 150); }
+    else if (type === 'netBounce') { fx.spawnImpact(ball.x, ball.y, 200); }
+    else if (type === 'point') { fx.spawnSandPuff(ball.x, ball.y); vibrate(30); }
+    else if (type === 'setWon') { fx.spawnConfetti(ball.x, Math.min(ball.y, 200)); }
   }
-}
-function releaseWakeLock() {
-  if (wakeLock) { wakeLock.release().catch(() => {}); wakeLock = null; }
-}
-
-function vibrate(ms) {
-  if (navigator.vibrate) navigator.vibrate(ms);
-}
-
-const NAME_KEY = 'spikebeef.name';
-function getStoredName() {
-  try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; }
-}
-function setStoredName(name) {
-  try { localStorage.setItem(NAME_KEY, name); } catch { /* storage unavailable — fine, just won't persist */ }
 }
 
 let appScreen = 'menu';
@@ -76,6 +67,7 @@ function closeOnline() {
 function goMenu() {
   releaseWakeLock();
   closeOnline();
+  fx.reset();
   appScreen = 'menu';
   cpu = null;
   renderMenu(overlay, {
@@ -256,12 +248,13 @@ function frame(now) {
     acc += elapsed;
     while (acc >= DT) {
       const localInput = keyboard.getP1() | touch.getMask();
-      online.tick(localInput);
+      const result = online.tick(localInput);
       acc -= DT;
       const display = online.getDisplayState();
       if (display) {
         state = display;
         spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
+        if (result) processEvents(result.events, state.ball);
         if (state.match.phase === 'matchWon') {
           appScreen = 'matchEnded';
           onMatchEnd();
@@ -278,10 +271,7 @@ function frame(now) {
       state = result.state;
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
-      for (const ev of result.events) {
-        if (ev === 'hit' || ev === 'spike') vibrate(15);
-        if (ev.type === 'point') vibrate(30);
-      }
+      processEvents(result.events, state.ball);
       if (state.match.phase === 'matchWon') {
         appScreen = 'matchEnded';
         onMatchEnd();
@@ -290,8 +280,14 @@ function frame(now) {
     }
   }
 
+  fx.update(elapsed);
   if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded')) {
-    render(ctx, state, spin);
+    const shake = fx.getShakeOffset();
+    ctx.save();
+    ctx.translate(shake.x, shake.y);
+    render(ctx, state, spin, now / 1000);
+    fx.draw(ctx);
+    ctx.restore();
   }
   requestAnimationFrame(frame);
 }
