@@ -133,3 +133,12 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   show streak/comeback/skunked callouts but not ace/long-rally ones. Not a crash, just a
   quieter banner on that side — documented rather than adding a new snapshot field this
   late for a flavor feature.
+- Character reactions and faces: `sim.js` sets the winner/loser's `lastEvent` to
+  'win'/'lose' with a sentinel timer (999) right when a point is awarded — it stays
+  frozen (nothing decays it during the point/set pause, since `updateCharge` doesn't run
+  then) until `createPlayer()` resets the player at the next serve, so the pose holds for
+  exactly the celebration window without any extra timer plumbing. `character.js` gives
+  'win' a both-arms-up pose and 'lose' a slumped-arms pose. Smirk (mouth curve) when
+  ahead by 4+, a sweat drop when behind by 4+ — computed in render.js from
+  `state.match.score` and passed down as a `mood` param, independent of the win/lose
+  pose so they don't fight each other.

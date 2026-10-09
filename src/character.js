@@ -9,7 +9,7 @@ const TORSO_LEN = 17;
 const HEAD_R = 15;
 const EMOTE_GLYPH = { laugh: '\u{1F602}', cry: '\u{1F62D}', sleep: '\u{1F4A4}', flex: '\u{1F4AA}' };
 
-export function drawPlayer(ctx, p, color, colorDark, facingBall) {
+export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   const facing = facingBall >= 0 ? 1 : -1;
   const airborne = !(p.onGround ?? true);
   const squash = airborne ? Math.max(0.82, 1 - Math.abs(p.vy) / 4200) : 1;
@@ -53,14 +53,26 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall) {
     armBack = facing * (-14 + 36 * progress);
     armFwd = facing * (14 + 20 * progress);
     armY = shoulderY + 6 - arc * 14;
+  } else if (p.lastEvent === 'win') {
+    // Little victory pose: both arms up.
+    armBack = -16;
+    armFwd = 16;
+    armY = shoulderY - 18;
+  } else if (p.lastEvent === 'lose') {
+    // Slump: arms hang low, shoulders drop.
+    armBack = -8;
+    armFwd = 8;
+    armY = shoulderY + 16;
   }
   capsule(ctx, 0, shoulderY + 2, armBack, armY, 7, colorDark);
   capsule(ctx, 0, shoulderY + 2, armFwd, armY, 7, colorDark);
 
   // Head
   outlinedCircle(ctx, 0, headY, HEAD_R, color);
-  const justImpacted = p.lastEvent && p.lastEventTimer > 0.22;
-  const eyeR = justImpacted ? 6 : 4.5;
+  const isWin = p.lastEvent === 'win';
+  const isLose = p.lastEvent === 'lose';
+  const justImpacted = !isLose && p.lastEvent && (isWin || p.lastEventTimer > 0.22);
+  const eyeR = isLose ? 3 : justImpacted ? 6 : 4.5;
   const eyeDX = facing * 3;
   ctx.fillStyle = '#fff';
   ctx.beginPath();
@@ -82,6 +94,32 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall) {
     ctx.lineTo(eyeDX - 1, headY - 6);
     ctx.moveTo(eyeDX, headY - 6);
     ctx.lineTo(eyeDX + 9, headY - 8 - browTilt);
+    ctx.stroke();
+  }
+
+  // Mouth: smile when winning or ahead by a lot, frown when losing/behind.
+  if (!p.charging) {
+    const smile = isWin || mood === 'ahead';
+    const frown = isLose || mood === 'behind';
+    if (smile || frown) {
+      ctx.strokeStyle = PALETTE.outline;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      const curve = smile ? 3 : -3;
+      ctx.moveTo(eyeDX - 4, headY + 6);
+      ctx.quadraticCurveTo(eyeDX, headY + 6 + curve, eyeDX + 4, headY + 6);
+      ctx.stroke();
+    }
+  }
+
+  // A single sweat drop when meaningfully behind and not already reacting.
+  if (mood === 'behind' && !isWin && !isLose && !p.charging) {
+    ctx.fillStyle = '#7fd8ff';
+    ctx.beginPath();
+    ctx.ellipse(eyeDX + HEAD_R * facing * 0.7, headY - HEAD_R * 0.6, 3, 5, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = PALETTE.outline;
+    ctx.lineWidth = 1;
     ctx.stroke();
   }
 

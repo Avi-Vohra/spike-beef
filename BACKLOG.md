@@ -23,7 +23,7 @@ with whatever time remains.
 [x] Emote taunts with bubbles and sounds, synced online
 [x] Quick lines menu
 [x] Announcer callouts and streaks
-[ ] Character reactions and faces
+[x] Character reactions and faces
 [ ] End cards, stats, slow-motion final point replay
 [ ] Head-to-head record
 

@@ -11,6 +11,17 @@ import { stepRandom } from './rng.js';
 const POINT_PAUSE_SECONDS = 1.2;
 const SET_PAUSE_SECONDS = 2.5;
 
+// Presentation-only reaction pose, held (frozen, since updateCharge doesn't
+// run during the point/set pause) until the next serve resets the players —
+// winner gets a little victory pose, loser slumps.
+function setPointReaction(players, groundSide) {
+  const winner = groundSide === 0 ? 1 : 0;
+  players[winner].lastEvent = 'win';
+  players[winner].lastEventTimer = 999;
+  players[groundSide].lastEvent = 'lose';
+  players[groundSide].lastEventTimer = 999;
+}
+
 export function createInitialState(seed = 1) {
   const match = createMatchState(0);
   return {
@@ -114,6 +125,7 @@ export function step(state, inputP1, inputP2) {
         if (fault) {
           const groundSide = p.side;
           awardPoint(next.match, groundSide, events);
+          setPointReaction(next.players, groundSide);
           next.pauseTimer = next.match.phase === 'setWon' ? SET_PAUSE_SECONDS : POINT_PAUSE_SECONDS;
           return { state: next, events };
         }
@@ -124,6 +136,7 @@ export function step(state, inputP1, inputP2) {
     if (touchedGround) {
       const groundSide = next.ball.x < NET_X ? 0 : 1;
       awardPoint(next.match, groundSide, events);
+      setPointReaction(next.players, groundSide);
       next.pauseTimer = next.match.phase === 'setWon' ? SET_PAUSE_SECONDS : POINT_PAUSE_SECONDS;
       return { state: next, events };
     }

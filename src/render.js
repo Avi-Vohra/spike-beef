@@ -185,8 +185,11 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   drawLandingMarker(ctx, state.ball, state.match.phase);
 
   const [p1, p2] = state.players;
-  drawPlayer(ctx, p1, PALETTE.p1, PALETTE.p1Dark, state.ball.x - p1.x);
-  drawPlayer(ctx, p2, PALETTE.p2, PALETTE.p2Dark, state.ball.x - p2.x);
+  const diff = (state.match.score ? state.match.score[0] - state.match.score[1] : 0);
+  const mood1 = diff >= 4 ? 'ahead' : diff <= -4 ? 'behind' : null;
+  const mood2 = diff <= -4 ? 'ahead' : diff >= 4 ? 'behind' : null;
+  drawPlayer(ctx, p1, PALETTE.p1, PALETTE.p1Dark, state.ball.x - p1.x, mood1);
+  drawPlayer(ctx, p2, PALETTE.p2, PALETTE.p2Dark, state.ball.x - p2.x, mood2);
   drawBall(ctx, state.ball, spin);
   if (emotes) {
     drawEmoteBubble(ctx, p1, emotes[0]);
