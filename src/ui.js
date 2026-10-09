@@ -105,6 +105,67 @@ export function renderJoinEntry(root, { onSubmit, onBack, error, prefillCode }) 
   root.appendChild(panel);
 }
 
+export function renderNameEntry(root, { initial, onSubmit, onBack }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = 'Your Name';
+  const input = document.createElement('input');
+  input.className = 'sb-input';
+  input.maxLength = 10;
+  input.placeholder = 'Name';
+  input.value = initial || '';
+  const submit = button('Continue');
+  submit.addEventListener('click', () => {
+    const name = input.value.trim().slice(0, 10) || 'Player';
+    onSubmit(name);
+  });
+  panel.appendChild(title);
+  panel.appendChild(input);
+  panel.appendChild(submit);
+  if (onBack) {
+    const back = button('Back');
+    back.addEventListener('click', onBack);
+    panel.appendChild(back);
+  }
+  root.appendChild(panel);
+}
+
+export function renderLobby(root, { localName, remoteName, localReady, remoteReady, onReady, onCancel }) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const title = document.createElement('h2');
+  title.className = 'sb-title';
+  title.textContent = 'Lobby';
+  const names = document.createElement('p');
+  names.className = 'sb-text';
+  names.textContent = `${localName} ${localReady ? '(ready)' : ''}  vs  ${remoteName || '...'} ${remoteName && remoteReady ? '(ready)' : ''}`;
+  const ready = button(localReady ? 'Waiting for opponent...' : 'Ready', !localReady);
+  const cancel = button('Cancel');
+  if (!localReady) ready.addEventListener('click', onReady);
+  cancel.addEventListener('click', onCancel);
+  panel.appendChild(title);
+  panel.appendChild(names);
+  panel.appendChild(ready);
+  panel.appendChild(cancel);
+  root.appendChild(panel);
+}
+
+export function renderCountdown(root, n) {
+  clear(root);
+  const panel = document.createElement('div');
+  panel.className = 'sb-panel';
+  const big = document.createElement('div');
+  big.className = 'sb-title';
+  big.style.fontSize = '64px';
+  big.textContent = n > 0 ? String(n) : 'GO!';
+  panel.appendChild(big);
+  root.appendChild(panel);
+}
+
 export function renderConnecting(root, message, { onCancel } = {}) {
   clear(root);
   const panel = document.createElement('div');

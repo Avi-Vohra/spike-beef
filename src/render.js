@@ -68,7 +68,7 @@ function drawNet(ctx, sway) {
 }
 
 function drawPlayer(ctx, p, color, colorDark, facingBall) {
-  const squash = p.onGround ? 1 : Math.max(0.85, 1 - Math.abs(p.vy) / 4000);
+  const squash = (p.onGround ?? true) ? 1 : Math.max(0.85, 1 - Math.abs(p.vy) / 4000);
   const rx = PLAYER_RADIUS * (2 - squash);
   const ry = PLAYER_RADIUS * squash;
 

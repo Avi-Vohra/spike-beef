@@ -1,6 +1,6 @@
 import {
   WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS,
-  createPlayer, createBall, stepPlayer, stepBallGravity,
+  createPlayer, createBall, stepPlayer, stepBallGravity, updateCharge,
   resolveBallBounds, resolveGround, resolvePlayerHit, HIT,
 } from './physics.js';
 import {
@@ -69,6 +69,7 @@ export function step(state, inputP1, inputP2) {
     return { state: next, events };
   }
 
+  for (const p of next.players) updateCharge(p, inputs[p.side], DT);
   for (let s = 0; s < SUBSTEPS; s++) {
     for (const p of next.players) stepPlayer(p, inputs[p.side], DT / SUBSTEPS);
   }
@@ -104,7 +105,7 @@ export function step(state, inputP1, inputP2) {
     const prevX = next.ball.x;
     const prevY = next.ball.y;
     stepBallGravity(next.ball, subDt);
-    resolveBallBounds(next.ball, events);
+    next.rngSeed = resolveBallBounds(next.ball, events, next.rngSeed, stepRandom);
 
     for (const p of next.players) {
       const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.side], events);

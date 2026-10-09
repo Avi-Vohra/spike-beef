@@ -4,6 +4,7 @@ import { createKeyboardInput, createTouchInput } from './input.js';
 import {
   renderMenu, renderHowToPlay, renderMatchEnd, renderPause, hideOverlay,
   renderOnlineMenu, renderCreateWaiting, renderJoinEntry, renderConnecting,
+  renderNameEntry, renderLobby, renderCountdown,
 } from './ui.js';
 import { createAi } from './ai.js';
 import { randomRoomCode } from './transport.js';
@@ -51,6 +52,14 @@ function vibrate(ms) {
   if (navigator.vibrate) navigator.vibrate(ms);
 }
 
+const NAME_KEY = 'spikebeef.name';
+function getStoredName() {
+  try { return localStorage.getItem(NAME_KEY) || ''; } catch { return ''; }
+}
+function setStoredName(name) {
+  try { localStorage.setItem(NAME_KEY, name); } catch { /* storage unavailable — fine, just won't persist */ }
+}
+
 let appScreen = 'menu';
 let state = null;
 let spin = 0;
@@ -78,20 +87,63 @@ function goMenu() {
 }
 
 function goOnlineMenu() {
+  const name = getStoredName();
+  if (!name) {
+    appScreen = 'nameEntry';
+    renderNameEntry(overlay, { initial: '', onSubmit: (n) => { setStoredName(n); goOnlineMenu(); }, onBack: goMenu });
+    return;
+  }
   appScreen = 'onlineMenu';
   renderOnlineMenu(overlay, { onCreate: createRoom, onJoin: () => goJoinEntry(), onBack: goMenu });
 }
 
+let lobbyState = null;
+
+function showLobby(localName, remoteName) {
+  appScreen = 'onlineLobby';
+  lobbyState = { localName, remoteName, localReady: false };
+  renderLobbyScreen();
+}
+
+function renderLobbyScreen() {
+  renderLobby(overlay, {
+    localName: lobbyState.localName,
+    remoteName: lobbyState.remoteName,
+    localReady: lobbyState.localReady,
+    onReady: () => {
+      lobbyState.localReady = true;
+      onlineHandle.sendReady();
+      renderLobbyScreen();
+    },
+    onCancel: () => { closeOnline(); goOnlineMenu(); },
+  });
+}
+
+function startCountdownThenMatch(ctrl) {
+  online = ctrl;
+  appScreen = 'countdown';
+  let n = 3;
+  renderCountdown(overlay, n);
+  const iv = setInterval(() => {
+    n -= 1;
+    if (n >= 0) renderCountdown(overlay, n);
+    else { clearInterval(iv); startOnlineMatch(); }
+  }, 700);
+}
+
 function createRoom() {
   const code = randomRoomCode();
+  const localName = getStoredName() || 'Player';
   appScreen = 'onlineWaiting';
   renderCreateWaiting(overlay, code, {
     onShare: () => shareRoomLink(code),
     onCancel: () => { closeOnline(); goOnlineMenu(); },
   });
-  onlineHandle = hostOnlineMatch(code, {
-    onConnected: (ctrl) => { online = ctrl; startOnlineMatch(); },
-    onError: () => { closeOnline(); goJoinEntry('', 'Connection failed. Try again.'); },
+  onlineHandle = hostOnlineMatch(code, localName, {
+    onRemoteName: (remoteName) => showLobby(localName, remoteName),
+    onBothReady: startCountdownThenMatch,
+    onError: () => { closeOnline(); goOnlineMenu(); },
+    onDisconnected: () => { closeOnline(); goMenu(); },
   });
 }
 
@@ -111,11 +163,14 @@ function goJoinEntry(prefillCode = '', error = '') {
 
 function joinRoom(code) {
   if (!code || code.length !== 4) { goJoinEntry(code, 'Enter the 4-letter room code.'); return; }
+  const localName = getStoredName() || 'Player';
   appScreen = 'onlineConnecting';
   renderConnecting(overlay, 'Connecting...', { onCancel: () => { closeOnline(); goOnlineMenu(); } });
-  onlineHandle = joinOnlineMatch(code, {
-    onConnected: (ctrl) => { online = ctrl; startOnlineMatch(); },
+  onlineHandle = joinOnlineMatch(code, localName, {
+    onRemoteName: (remoteName) => showLobby(localName, remoteName),
+    onBothReady: startCountdownThenMatch,
     onError: () => { closeOnline(); goJoinEntry(code, 'Room not found, full, or connection failed.'); },
+    onDisconnected: () => { closeOnline(); goMenu(); },
   });
 }
 
@@ -178,7 +233,13 @@ window.addEventListener('keydown', (e) => {
 
 const roomFromLink = new URLSearchParams(location.search).get('room');
 if (roomFromLink && /^[A-Za-z]{4}$/.test(roomFromLink)) {
-  joinRoom(roomFromLink.toUpperCase());
+  const code = roomFromLink.toUpperCase();
+  if (getStoredName()) {
+    joinRoom(code);
+  } else {
+    appScreen = 'nameEntry';
+    renderNameEntry(overlay, { initial: '', onSubmit: (n) => { setStoredName(n); joinRoom(code); }, onBack: goMenu });
+  }
 } else {
   goMenu();
 }

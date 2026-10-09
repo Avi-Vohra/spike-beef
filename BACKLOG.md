@@ -16,7 +16,7 @@ with whatever time remains.
 [x] netcode.js host/guest, snapshots, input redundancy; net test (a)
 [x] Guest prediction, interpolation, event dedupe; net tests (b) and (c)
 [x] PeerTransport, room codes, share link, join by link, error screens
-[ ] Lobby, names, ready, countdown, mirrored guest view
+[x] Lobby, names, ready, countdown, mirrored guest view
 [ ] Ping indicator, reconnect, forfeit, rematch
 
 ## Tier 3, trash talk
