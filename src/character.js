@@ -1,7 +1,7 @@
 // Character drawing: the limbed player figure and its emote speech bubble.
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
-import { GROUND_Y, PLAYER_RADIUS, WIDTH } from './physics.js';
+import { GROUND_Y, PLAYER_RADIUS, WIDTH, SPIKE_MIN_CHARGE } from './physics.js';
 import {
   PALETTE, shadedCircle, roundRect, capsule, chargeColor, lighten,
 } from './art.js';
@@ -144,19 +144,25 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   ctx.fill();
 
   // Charge meter — a small filling pill above the head, color ramps with
-  // charge so the telegraph is unmistakable from across the court.
+  // charge so the telegraph is unmistakable from across the court. While
+  // airborne, once charge crosses SPIKE_MIN_CHARGE the bar switches to a
+  // distinct bright ring — "you can spike right now if you release" — the
+  // direct visual payoff for the spike-threshold fix (spike used to fire
+  // off almost any charge in the air; now it needs a real commitment, so
+  // players need a way to feel exactly when they've crossed that line).
   if (p.charging) {
     const barW = 30;
     const bx = -barW / 2;
     const by = headY - HEAD_R - 14;
+    const spikeReady = airborne && p.charge >= SPIKE_MIN_CHARGE;
     ctx.fillStyle = 'rgba(36,26,20,0.55)';
     roundRect(ctx, bx, by, barW, 7, 3);
     ctx.fill();
-    ctx.fillStyle = chargeColor(p.charge);
+    ctx.fillStyle = spikeReady ? '#fff6e0' : chargeColor(p.charge);
     roundRect(ctx, bx, by, barW * Math.min(1, p.charge), 7, 3);
     ctx.fill();
-    ctx.strokeStyle = PALETTE.outline;
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = spikeReady ? '#ffe066' : PALETTE.outline;
+    ctx.lineWidth = spikeReady ? 2.5 : 1.5;
     roundRect(ctx, bx, by, barW, 7, 3);
     ctx.stroke();
   }
