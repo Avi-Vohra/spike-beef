@@ -562,3 +562,17 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   Pushed main.js to 325 lines (was already an accepted 319-line overage, documented
   earlier this session — a few more lines for a self-contained 4-line render-block change
   isn't worth a hasty split).
+- **Found a real "how do I know how to hit" regression — at the instructions layer**:
+  the in-game "How to Play" screen still described the ORIGINAL pre-redesign instant-tap
+  model ("Jump + hit near the top of your jump = spike. Hit while standing = bump.") —
+  it never mentioned charge-and-release, tip, block, dive, charged serve, or the new
+  shot-placement mechanic at all. Every one of those shipped this session without the
+  one screen whose whole job is explaining controls ever being updated. This is exactly
+  the "can't tell how to hit" complaint the whole redesign was supposed to fix, just
+  silently reintroduced one layer up. Rewrote it to describe the actual current model.
+  Verified visually (not just read-through): hit a browser-cache snag first — a plain
+  `navigate` to the same URL kept serving the OLD module from Chrome's cache even though
+  `curl`ing the dev server directly showed the file was already updated — a hard reload
+  (cmd+shift+r) was needed to see the real current state. Worth remembering for any
+  future live-browser check in this environment: a `navigate` alone isn't sufficient
+  proof of "what's actually running," a hard reload is.
