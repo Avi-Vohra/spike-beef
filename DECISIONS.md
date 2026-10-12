@@ -606,3 +606,10 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   highest-commitment shot firing almost as often as an ordinary one. Raised to 0.3 (a
   real, deliberate charge). Re-measured after: spikes 2842 (down ~17%), hits 4479 (up
   slightly), rally length basically unchanged (5.02 -> 4.84). Full test suite still PASS.
+- **Hands and feet**: added small filled circles/ellipses at the end of every arm and
+  leg capsule — previously those were bare stroked-line ends, which read as amputated
+  stumps at this character scale. Feet track the actual swinging leg endpoint (not a
+  fixed position) so they stay attached through the run cycle. Hands sit at the exact
+  point that resolves a hit in physics.js, the most relevant spot for "hit graphics."
+  Verified via zoomed screenshot before keeping (same discipline as every other art
+  change this session) — reads as rounded limb ends, not a separate/floating shape.

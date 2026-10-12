@@ -36,9 +36,16 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   const shoulderY = hipY - TORSO_LEN;
   const headY = shoulderY - HEAD_R * 0.6;
 
-  // Legs
+  // Legs, with small feet at the ground end of each — a bare capsule end
+  // reads as an amputated stump at this size; a tiny foot closes the
+  // silhouette and gives the run cycle somewhere to visibly plant.
   capsule(ctx, -4, 0, -4 + legSwing * 0.5, hipY, 9, colorDark);
   capsule(ctx, 4, 0, 4 + legSwing2 * 0.5, hipY, 9, colorDark);
+  ctx.fillStyle = PALETTE.outline;
+  ctx.beginPath();
+  ctx.ellipse(-4 + legSwing * 0.5 + facing * 3, 1, 7, 4, 0, 0, Math.PI * 2);
+  ctx.ellipse(4 + legSwing2 * 0.5 + facing * 3, 1, 7, 4, 0, 0, Math.PI * 2);
+  ctx.fill();
 
   // Torso — a thin lighter highlight stripe down one side (offset toward
   // the facing direction, like light catching the near edge) gives the
@@ -81,6 +88,15 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   }
   capsule(ctx, 0, shoulderY + 2, armBack, armY, 7, colorDark);
   capsule(ctx, 0, shoulderY + 2, armFwd, armY, 7, colorDark);
+  // Hands at each arm's end — the part that actually does the hitting, so
+  // this is the single most important silhouette addition for "hit
+  // graphics": without it, a swing was just an armless line snapping
+  // through empty space.
+  ctx.fillStyle = PALETTE.outline;
+  ctx.beginPath();
+  ctx.arc(armBack, armY, 4.5, 0, Math.PI * 2);
+  ctx.arc(armFwd, armY, 4.5, 0, Math.PI * 2);
+  ctx.fill();
 
   // Head — shaded sphere (gradient) instead of a flat disc, for a rounder,
   // more dimensional read, same "more 3D" cheap-win idea as the ball.
