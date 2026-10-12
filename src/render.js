@@ -113,7 +113,7 @@ function drawLandingMarker(ctx, ball, phase) {
   ctx.stroke();
 }
 
-function drawBall(ctx, ball, spin) {
+function drawBall(ctx, ball, spin, squash = null) {
   const height = Math.max(0, GROUND_Y - ball.y);
   const shadowScale = Math.max(0.28, 1 - height / 360);
   ctx.fillStyle = PALETTE.shadow;
@@ -142,6 +142,16 @@ function drawBall(ctx, ball, spin) {
 
   ctx.save();
   ctx.translate(ball.x, ball.y);
+  // Squash-and-stretch at the moment of contact: flattened perpendicular to
+  // the impact direction, stretched along it, like a real ball deforming
+  // under a hard hit. Done by rotating into the impact-aligned frame,
+  // scaling, then rotating back — kept separate from the spin rotation
+  // below so the squash direction doesn't spin with the ball.
+  if (squash && squash.amount > 0.001) {
+    ctx.rotate(squash.angle);
+    ctx.scale(1 + squash.amount * 0.7, 1 - squash.amount * 0.5);
+    ctx.rotate(-squash.angle);
+  }
   ctx.rotate(spin);
   shadedCircle(ctx, 0, 0, BALL_RADIUS, PALETTE.ball, PALETTE.ballDark, PALETTE.ballLine, 2);
   ctx.strokeStyle = PALETTE.ballLine;
@@ -238,7 +248,7 @@ export function renderIdle(ctx, timeSec = 0) {
   drawNet(ctx, 0);
 }
 
-export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null, netSway = 0) {
+export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null, netSway = 0, ballSquash = null) {
   if (!bgCanvas) buildBackground();
   ctx.drawImage(bgCanvas, 0, 0);
   drawClouds(ctx, timeSec);
@@ -256,7 +266,7 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   if (state.match.phase === 'serve') {
     drawServeIndicator(ctx, state.players[state.match.server], timeSec);
   }
-  drawBall(ctx, state.ball, spin);
+  drawBall(ctx, state.ball, spin, ballSquash);
   if (emotes) {
     drawEmoteBubble(ctx, p1, emotes[0]);
     drawEmoteBubble(ctx, p2, emotes[1]);

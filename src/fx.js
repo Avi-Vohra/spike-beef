@@ -7,10 +7,19 @@ let shakeMag = 0;
 let netSway = 0;
 let netSwayVel = 0;
 let punchMag = 0; // extra camera scale (0 = no zoom), decays toward 0
+let ballSquash = 0; // 0 = round, decays toward 0
+let ballSquashAngle = 0; // direction of the squash (radians), set on trigger
 
 export function triggerShake(mag, duration = 0.15) {
   shakeMag = Math.max(shakeMag, mag);
   shakeTime = Math.max(shakeTime, duration);
+}
+
+// A brief squash-and-stretch on the ball itself at the moment of contact —
+// flattened perpendicular to the impact direction, stretched along it, like
+// a real ball deforming under a hard hit. Decays back to round fast.
+export function triggerBallSquash(mag, angle) {
+  if (mag > ballSquash) { ballSquash = mag; ballSquashAngle = angle; }
 }
 
 // A brief camera punch-in on the hardest hits — the "feel" equivalent of
@@ -45,6 +54,7 @@ export function spawnImpact(x, y, power, angle = null) {
   const intensity = Math.min(1, power / 700);
   spawn(x, y, 4 + Math.round(intensity * 8), '#fff6e0', 80 + intensity * 220, 0.28 + intensity * 0.15, 4, angle, 2.0);
   if (intensity > 0.4) triggerShake(2 + intensity * 7, 0.08 + intensity * 0.1);
+  if (angle !== null) triggerBallSquash(intensity * 0.45, angle);
 }
 
 export function spawnSandPuff(x, y) {
@@ -62,6 +72,10 @@ export function spawnConfetti(x, y) {
 export function update(dt) {
   if (shakeTime > 0) shakeTime -= dt;
   else shakeMag = 0;
+
+  // Ball squash: fast exponential decay back to round (~0.1s to mostly settle).
+  ballSquash = Math.max(0, ballSquash - ballSquash * 16 * dt);
+  if (ballSquash < 0.004) ballSquash = 0;
 
   // Net sway: a tiny damped spring, nudged by triggerNetSway() on contact.
   netSway += netSwayVel * dt;
@@ -84,6 +98,7 @@ export function update(dt) {
 
 export function getNetSway() { return netSway; }
 export function getPunchScale() { return 1 + punchMag; }
+export function getBallSquash() { return { amount: ballSquash, angle: ballSquashAngle }; }
 
 export function getShakeOffset() {
   if (shakeTime <= 0 || shakeMag <= 0) return { x: 0, y: 0 };
@@ -109,4 +124,5 @@ export function reset() {
   netSway = 0;
   netSwayVel = 0;
   punchMag = 0;
+  ballSquash = 0;
 }

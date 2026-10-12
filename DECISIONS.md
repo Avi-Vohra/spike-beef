@@ -632,3 +632,16 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   two separate devices online, both need to know whose serve it is; a CPU opponent
   doesn't need telling). Verified visually via screenshot — reads clearly over the
   server's head. Directly relevant to the 2-player (local + online) focus requested.
+- **Ball squash-and-stretch**: the ball now briefly deforms (flattened perpendicular to
+  impact, stretched along it) at the moment of contact, decaying back to round in ~0.1s
+  — classic game-feel technique, same impact-angle data already computed for the
+  directional particles. Implemented via rotate-into-impact-frame / scale / rotate-back
+  around the ball's own translate, kept separate from the spin rotation so squash
+  direction doesn't spin with the ball. Verified the decay curve numerically under Node
+  (fx.js has no DOM dependency) and confirmed no console errors / correct render in the
+  live browser after wiring it through render.js and main.js.
+- Noted for future live checks: the dev server's no-cache headers (needed to fix stale
+  content) make every navigation re-fetch the whole module graph from disk, which is
+  measurably slower than before — a click right after `navigate` now needs a longer
+  wait (~2s, not ~1s) before the menu's listeners are actually attached, or it silently
+  does nothing. Not a bug, just a different timing budget than earlier in this session.

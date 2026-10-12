@@ -314,7 +314,7 @@ function frame(now) {
     ctx.translate(WIDTH / 2 + shake.x, HEIGHT / 2 + shake.y);
     ctx.scale(punchScale, punchScale);
     ctx.translate(-WIDTH / 2, -HEIGHT / 2);
-    render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null, fx.getNetSway());
+    render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null, fx.getNetSway(), fx.getBallSquash());
     fx.draw(ctx);
     ctx.restore();
   } else {
