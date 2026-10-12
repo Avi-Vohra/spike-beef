@@ -2,7 +2,7 @@
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
 import {
-  GROUND_Y, PLAYER_RADIUS, WIDTH, SPIKE_MIN_CHARGE, HIT_COOLDOWN,
+  GROUND_Y, PLAYER_RADIUS, WIDTH, SPIKE_MIN_CHARGE, HIT_COOLDOWN, DIVE_COOLDOWN,
 } from './physics.js';
 import {
   PALETTE, shadedCircle, roundRect, capsule, chargeColor, lighten,
@@ -36,6 +36,20 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.arc(p.x, p.y - PLAYER_RADIUS * 0.6, PLAYER_RADIUS + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // Dive-cooldown arc: a partial ring (longer, more noticeable than the hit
+  // cooldown above, since DIVE_COOLDOWN is 0.6s not 0.18s) sweeping closed
+  // as the cooldown counts down — without it, a double-tap that silently
+  // fails right after a dive looks identical to a missed input rather than
+  // "you just used that, wait a beat."
+  if (p.diveCooldownTimer > 0) {
+    const frac = Math.min(1, p.diveCooldownTimer / DIVE_COOLDOWN);
+    ctx.strokeStyle = 'rgba(127,216,255,0.75)';
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - PLAYER_RADIUS * 0.6, PLAYER_RADIUS + 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
     ctx.stroke();
   }
 

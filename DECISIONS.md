@@ -650,3 +650,8 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   second touch silently not registering (by design, so one swept contact across several
   substeps doesn't count as 3) just looked like unresponsive controls. Drawn in world
   space before the squash/dive transform so it stays a clean circle regardless of pose.
+- **Dive-cooldown arc**: a closing cyan arc (0.6s, matches DIVE_COOLDOWN) around a player
+  who just dove — same "why didn't that work" problem as the hit cooldown but for dive's
+  longer, more noticeable lockout window. Distinct color/radius from the hit-cooldown
+  ring so the two never get confused when they happen to overlap (a dive followed
+  immediately by a touch).
