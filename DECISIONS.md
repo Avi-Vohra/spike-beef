@@ -645,3 +645,8 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   measurably slower than before — a click right after `navigate` now needs a longer
   wait (~2s, not ~1s) before the menu's listeners are actually attached, or it silently
   does nothing. Not a bug, just a different timing budget than earlier in this session.
+- **Hit-cooldown ring**: a thin fading circle appears around a player for the brief
+  HIT_COOLDOWN window (0.18s) right after they touch the ball — without any cue, a rapid
+  second touch silently not registering (by design, so one swept contact across several
+  substeps doesn't count as 3) just looked like unresponsive controls. Drawn in world
+  space before the squash/dive transform so it stays a clean circle regardless of pose.

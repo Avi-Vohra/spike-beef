@@ -1,7 +1,9 @@
 // Character drawing: the limbed player figure and its emote speech bubble.
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
-import { GROUND_Y, PLAYER_RADIUS, WIDTH, SPIKE_MIN_CHARGE } from './physics.js';
+import {
+  GROUND_Y, PLAYER_RADIUS, WIDTH, SPIKE_MIN_CHARGE, HIT_COOLDOWN,
+} from './physics.js';
 import {
   PALETTE, shadedCircle, roundRect, capsule, chargeColor, lighten,
 } from './art.js';
@@ -21,6 +23,21 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   ctx.beginPath();
   ctx.ellipse(p.x, GROUND_Y + 2, PLAYER_RADIUS * 0.85, 7, 0, 0, Math.PI * 2);
   ctx.fill();
+
+  // Hit-cooldown ring: a thin fading circle while this player can't touch
+  // the ball again yet. Without any cue here, a rapid second touch that
+  // silently does nothing (by design, to stop one swept contact registering
+  // as several) just looks like a bug — this makes the "why didn't that
+  // count" window visible. Drawn in world space (before the squash/dive
+  // transform below) so it stays a clean circle regardless of pose.
+  if (p.hitCooldown > 0) {
+    const t = p.hitCooldown / HIT_COOLDOWN;
+    ctx.strokeStyle = `rgba(244,241,232,${0.5 * t})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - PLAYER_RADIUS * 0.6, PLAYER_RADIUS + 5, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 
   ctx.save();
   ctx.translate(p.x, p.y);
