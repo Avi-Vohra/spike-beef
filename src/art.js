@@ -16,6 +16,7 @@ export const PALETTE = {
   p2: '#4fc3f7',
   p2Dark: '#2f8cb0',
   ball: '#fff6e0',
+  ballDark: '#e0b878',
   ballLine: '#241a14',
   shadow: 'rgba(20,10,0,0.25)',
   ui: '#241a14',
@@ -68,4 +69,36 @@ export function outlinedCircle(ctx, x, y, r, fill, outline = PALETTE.outline, li
   ctx.lineWidth = lineWidth;
   ctx.strokeStyle = outline;
   ctx.stroke();
+}
+
+// Same as outlinedCircle but filled with a radial gradient (bright highlight
+// top-left, darkened rim) instead of a flat color — reads as a lit sphere
+// rather than a flat disc, the cheapest possible "more 3D" win for every
+// round shape on screen (ball, heads) without touching the 2D sim at all.
+export function shadedCircle(ctx, x, y, r, fill, dark, outline = PALETTE.outline, lineWidth = 3) {
+  const hlX = x - r * 0.35;
+  const hlY = y - r * 0.4;
+  const grad = ctx.createRadialGradient(hlX, hlY, r * 0.05, x, y, r * 1.15);
+  grad.addColorStop(0, lighten(fill, 0.45));
+  grad.addColorStop(0.55, fill);
+  grad.addColorStop(1, dark);
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = grad;
+  ctx.fill();
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = outline;
+  ctx.stroke();
+}
+
+// Blends a hex color toward white by `t` (0..1) — used to synthesize a
+// highlight tone for shadedCircle without needing a second palette color
+// for every round shape.
+function lighten(hex, t) {
+  const n = parseInt(hex.slice(1), 16);
+  const r = (n >> 16) & 0xff;
+  const g = (n >> 8) & 0xff;
+  const b = n & 0xff;
+  const mix = (c) => Math.round(c + (255 - c) * t);
+  return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
 }

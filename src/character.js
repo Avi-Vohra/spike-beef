@@ -2,7 +2,7 @@
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
 import { GROUND_Y, PLAYER_RADIUS, WIDTH } from './physics.js';
-import { PALETTE, outlinedCircle, roundRect, capsule, chargeColor } from './art.js';
+import { PALETTE, shadedCircle, roundRect, capsule, chargeColor } from './art.js';
 
 const LEG_LEN = 15;
 const TORSO_LEN = 17;
@@ -75,8 +75,9 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   capsule(ctx, 0, shoulderY + 2, armBack, armY, 7, colorDark);
   capsule(ctx, 0, shoulderY + 2, armFwd, armY, 7, colorDark);
 
-  // Head
-  outlinedCircle(ctx, 0, headY, HEAD_R, color);
+  // Head — shaded sphere (gradient) instead of a flat disc, for a rounder,
+  // more dimensional read, same "more 3D" cheap-win idea as the ball.
+  shadedCircle(ctx, 0, headY, HEAD_R, color, colorDark);
   const isWin = p.lastEvent === 'win';
   const isLose = p.lastEvent === 'lose';
   const justImpacted = !isLose && p.lastEvent && (isWin || p.lastEventTimer > 0.22);

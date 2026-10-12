@@ -503,3 +503,23 @@ a proper clipped diamond-mesh crosshatch instead of the old ladder look.
   reliably sustain. Noting this explicitly so a future "it looks frozen in the browser"
   observation isn't mistaken for a new regression without first checking
   `document.visibilityState`.
+
+## Continuing per explicit user instruction: mechanics + graphics, extras deprioritized
+User confirmed extras (courts/cosmetics/settings/practice mode) aren't a priority and
+asked to keep iterating specifically on mechanics feel and graphics, without stopping.
+- **Movement feel**: `stepPlayer` previously snapped `vx` instantly to ±MOVE_SPEED or 0
+  the moment a direction bit changed — zero inertia, which reads as robotic/teleport-y.
+  Added `MOVE_ACCEL`/`MOVE_DECEL` (6500/7800 px/s^2) so velocity ramps to full speed in
+  ~4 ticks (~0.067s, confirmed via a direct trace: vx hits 430 by tick 3) — imperceptible
+  as sluggish, but removes the instant-snap feel. Deliberately NOT a skill/positioning
+  cost (unlike the earlier movement-while-charging experiment that was reverted for
+  exactly that reason) — pure feel polish. Dive still bypasses this entirely (sets vx
+  directly, unchanged). Full test suite still green after the change (win-share stayed
+  in the same already-documented noisy range, not a new regression).
+- **Graphics — "more 3D" read for round shapes**: added `shadedCircle` to art.js (radial
+  gradient: bright highlight top-left, darkened rim, same idea as a lit sphere) and
+  swapped it in for both the ball and character heads (previously flat-filled
+  `outlinedCircle`). Verified visually via zoomed screenshots, not just by reading the
+  code — both now clearly read as rounded/lit rather than flat discs. Limbs/torso left
+  as flat-colored capsules (stroked lines, not easily gradient-shaded without a larger
+  rewrite) — judged lower value than the two most-looked-at round shapes on screen.

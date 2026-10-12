@@ -11,6 +11,12 @@ export const PLAYER_RADIUS = 26;
 export const BALL_RADIUS = 12;
 export const GRAVITY = 1150; // lower than a naive first pass: longer hang time = more reaction time
 export const MOVE_SPEED = 430;
+// A tiny ramp instead of an instant 0->MOVE_SPEED snap — purely a feel fix,
+// not a skill/positioning cost: full speed is still reached in ~4 ticks
+// (~0.067s), imperceptible as "sluggish" but enough to kill the teleport-y
+// robotic start/stop the original redesign complaint was partly about.
+export const MOVE_ACCEL = 6500; // px/s^2 while a direction is held
+export const MOVE_DECEL = 7800; // px/s^2 while no direction is held (snappier stop than start)
 export const JUMP_VY = -560;
 export const BALL_RESTITUTION = 0.72;
 export const DT = 1 / 60;
@@ -157,14 +163,16 @@ export function stepPlayer(p, input, dt) {
   // AI chases that could never quite close the last few pixels. Charge is
   // purely a timing/commitment skill now: hold longer for more power,
   // released at the right moment, with no positioning cost.
-  let vx = 0;
   if (p.diving) {
-    vx = p.diveDir * DIVE_SPEED;
+    p.vx = p.diveDir * DIVE_SPEED;
   } else {
-    if (input & LEFT) vx -= MOVE_SPEED;
-    if (input & RIGHT) vx += MOVE_SPEED;
+    const dirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
+    const target = dirX * MOVE_SPEED;
+    const accel = dirX !== 0 ? MOVE_ACCEL : MOVE_DECEL;
+    const maxStep = accel * dt;
+    const delta = target - p.vx;
+    p.vx += Math.max(-maxStep, Math.min(maxStep, delta));
   }
-  p.vx = vx;
   p.x += p.vx * dt;
   if (p.x < lo) p.x = lo;
   if (p.x > hi) p.x = hi;

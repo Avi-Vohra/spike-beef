@@ -2,7 +2,7 @@ import {
   WIDTH, HEIGHT, GROUND_Y, NET_X, NET_TOP, NET_HALF_W, BALL_RADIUS,
 } from './physics.js';
 import { predictLandingPoint } from './ball.js';
-import { PALETTE, outlinedCircle } from './art.js';
+import { PALETTE, shadedCircle } from './art.js';
 import { drawPlayer, drawEmoteBubble } from './character.js';
 import { drawNet } from './net.js';
 
@@ -143,7 +143,7 @@ function drawBall(ctx, ball, spin) {
   ctx.save();
   ctx.translate(ball.x, ball.y);
   ctx.rotate(spin);
-  outlinedCircle(ctx, 0, 0, BALL_RADIUS, PALETTE.ball, PALETTE.ballLine, 2);
+  shadedCircle(ctx, 0, 0, BALL_RADIUS, PALETTE.ball, PALETTE.ballDark, PALETTE.ballLine, 2);
   ctx.strokeStyle = PALETTE.ballLine;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
