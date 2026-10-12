@@ -1,5 +1,5 @@
 import { createInitialState, step } from './sim.js';
-import { render } from './render.js';
+import { render, renderIdle } from './render.js';
 import * as fx from './fx.js';
 import { createKeyboardInput, createTouchInput } from './input.js';
 import {
@@ -313,6 +313,8 @@ function frame(now) {
     render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null, fx.getNetSway());
     fx.draw(ctx);
     ctx.restore();
+  } else {
+    renderIdle(ctx, now / 1000);
   }
   requestAnimationFrame(frame);
 }

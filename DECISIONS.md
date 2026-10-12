@@ -468,3 +468,38 @@ these rallies — they never got to touch the ball at all.
   per-match tick budget in tests from 8 to 12 simulated minutes, since healthier/longer
   rallies legitimately push some close matches past the old budget — a real, good
   consequence of the fix, not something to paper over by cutting rallies short again.
+
+## Live browser verification + a false-alarm "frozen game" investigation
+First real in-browser visual check this session (via Chrome automation tools, not just
+reasoning about the code): loaded the menu, started a vs-CPU match, and confirmed all
+three recent visual fixes actually render correctly in a live canvas, not just in
+isolated reasoning — the idle backdrop shows behind the menu (no raw black), the sand's
+forced-perspective corners are fully covered (no black wedges), and the net renders as
+a proper clipped diamond-mesh crosshatch instead of the old ladder look.
+- **False alarm investigated and resolved**: after starting a match, the ball/score
+  appeared completely frozen across multiple screenshots spanning 15+ real seconds
+  (well past the 5s auto-serve timeout), while background clouds visibly drifted —
+  looked exactly like a sim-loop regression. Instrumented `main.js`'s `frame()` with a
+  temporary `window.__debug` counter (appScreen/state/tick/frameCalls) to check directly
+  rather than guess. Confirmed: `document.visibilityState` on the automated tab is
+  `"hidden"` (Chrome backgrounds tabs driven by the extension even though
+  `document.hasFocus()` is true for input dispatch), and `frameCalls` stayed completely
+  flat across clicks and a 6s wait — `requestAnimationFrame` itself was being throttled
+  to near-zero by Chrome's background-tab policy, not paused by any game-code bug. The
+  cloud drift that looked like "proof the loop is running" is actually computed from an
+  absolute `performance.now()` timestamp independent of the tick accumulator, so it
+  moves on the rare frame that does fire while the sim-stepping logic (gated by the same
+  `frame()` call) effectively never gets enough callbacks to accumulate a real serve.
+  Removed the debug instrumentation after confirming the diagnosis; `node --check` and
+  the full `node tests/run.mjs` suite both still pass, confirming nothing in `main.js`
+  was actually broken.
+- **Implication for remaining audit work**: this automation can verify static visual
+  state (screenshots) reliably, but NOT sustained real-time gameplay flow (serves,
+  rallies, scoring) — the backgrounded tab's rAF throttling makes elapsed sim-time
+  diverge arbitrarily from wall-clock time. Continuing the rest of this audit pass via
+  the existing Node-side sim/physics/stress test harness (the same methodology that has
+  caught every real bug this session) plus sparse, static screenshot checks for visual
+  regressions — not via sustained live-interaction testing, which this tooling can't
+  reliably sustain. Noting this explicitly so a future "it looks frozen in the browser"
+  observation isn't mistaken for a new regression without first checking
+  `document.visibilityState`.

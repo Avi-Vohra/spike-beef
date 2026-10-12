@@ -4,6 +4,7 @@ import {
 import { predictLandingPoint } from './ball.js';
 import { PALETTE, outlinedCircle } from './art.js';
 import { drawPlayer, drawEmoteBubble } from './character.js';
+import { drawNet } from './net.js';
 
 let bgCanvas = null;
 
@@ -29,16 +30,31 @@ function buildBackground() {
   ctx.fillStyle = PALETTE.sea;
   ctx.fillRect(0, GROUND_Y - 60, WIDTH, 60);
 
-  // Sand drawn with a very slight trapezoid (wider at the bottom) for a
-  // cheap forced-perspective read — still a flat 2D sim, just a visual tilt.
+  // Solid full-width base first — the trapezoid below is an overlay shading
+  // effect, not the only thing covering this band: without this base, its
+  // inset top corners (the "forced perspective" tilt) left the canvas's
+  // raw black showing through at the corners, confirmed visually via a
+  // real screenshot, not assumed.
   ctx.fillStyle = PALETTE.sand;
+  ctx.fillRect(0, GROUND_Y, WIDTH, HEIGHT - GROUND_Y);
+
+  // Slight trapezoid tint (wider at the bottom) for a cheap forced-
+  // perspective read — still a flat 2D sim, just a visual tilt.
+  ctx.fillStyle = PALETTE.sandDark;
+  ctx.globalAlpha = 0.25;
   ctx.beginPath();
-  ctx.moveTo(18, GROUND_Y);
-  ctx.lineTo(WIDTH - 18, GROUND_Y);
-  ctx.lineTo(WIDTH, HEIGHT);
+  ctx.moveTo(0, GROUND_Y);
+  ctx.lineTo(18, GROUND_Y);
   ctx.lineTo(0, HEIGHT);
   ctx.closePath();
   ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(WIDTH, GROUND_Y);
+  ctx.lineTo(WIDTH - 18, GROUND_Y);
+  ctx.lineTo(WIDTH, HEIGHT);
+  ctx.closePath();
+  ctx.fill();
+  ctx.globalAlpha = 1;
   ctx.fillStyle = PALETTE.sandDark;
   for (let i = 0; i < 70; i++) {
     const sx = (i * 97) % WIDTH;
@@ -83,36 +99,6 @@ function drawSeaWave(ctx, timeSec) {
     if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
   }
   ctx.stroke();
-}
-
-function drawNet(ctx, sway) {
-  ctx.strokeStyle = PALETTE.netPost;
-  ctx.lineWidth = 8;
-  ctx.beginPath();
-  ctx.moveTo(NET_X, GROUND_Y);
-  ctx.lineTo(NET_X, NET_TOP - 10);
-  ctx.stroke();
-
-  ctx.fillStyle = PALETTE.net;
-  ctx.strokeStyle = PALETTE.outline;
-  ctx.lineWidth = 2;
-  const top = NET_TOP + sway;
-  ctx.beginPath();
-  ctx.moveTo(NET_X - NET_HALF_W - 8, top);
-  ctx.lineTo(NET_X + NET_HALF_W + 8, top - sway * 0.3);
-  ctx.lineTo(NET_X + NET_HALF_W + 6, GROUND_Y);
-  ctx.lineTo(NET_X - NET_HALF_W - 6, GROUND_Y);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.strokeStyle = 'rgba(36,26,20,0.3)';
-  ctx.lineWidth = 1;
-  for (let y = top + 10; y < GROUND_Y; y += 14) {
-    ctx.beginPath();
-    ctx.moveTo(NET_X - NET_HALF_W - 7, y);
-    ctx.lineTo(NET_X + NET_HALF_W + 7, y);
-    ctx.stroke();
-  }
 }
 
 function drawLandingMarker(ctx, ball, phase) {
@@ -215,6 +201,19 @@ function drawBanner(ctx, text) {
   ctx.fillStyle = PALETTE.chargeMid;
   ctx.fillText(text, WIDTH / 2, 110);
   ctx.restore();
+}
+
+// A static-ish backdrop (background + net, no players/ball/HUD) for screens
+// with no active match state — menus, lobby, etc. Without this the canvas
+// was simply raw black behind every pre-match screen, which looked
+// unfinished and wasted the court art entirely until the first match
+// started.
+export function renderIdle(ctx, timeSec = 0) {
+  if (!bgCanvas) buildBackground();
+  ctx.drawImage(bgCanvas, 0, 0);
+  drawClouds(ctx, timeSec);
+  drawSeaWave(ctx, timeSec);
+  drawNet(ctx, 0);
 }
 
 export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = null, silentMs = null, netSway = 0) {
