@@ -53,7 +53,16 @@ export const BLOCK_STEEP = 0.45; // fast and flat — punched straight down
 export const DIVE_SPEED = 820;
 export const DIVE_DURATION = 0.22;
 export const DIVE_COOLDOWN = 0.6;
-export const DOUBLE_TAP_WINDOW = 0.25;
+// A real double-tap needs a genuine pause between release and re-press, not
+// just "within a window" — see dive.js for why the naive max-only check
+// fired constantly from ordinary bang-bang movement correction.
+export const DOUBLE_TAP_MIN_GAP = 0.08;
+export const DOUBLE_TAP_MAX_GAP = 0.22;
+// Diving only makes sense as a reach for a ball you could plausibly get to
+// — gating on proximity also rules out nearly all accidental triggers from
+// ordinary repositioning noise, which happens mostly while the ball is
+// still far away.
+export const DIVE_MAX_BALL_DIST = 260;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -64,7 +73,7 @@ export function createPlayer(side) {
     charging: false, charge: 0, aimDir: 0, justReleased: false, releaseCharge: 0,
     releaseGraceTimer: 0,
     diving: false, diveTimer: 0, diveCooldownTimer: 0, diveDir: 0,
-    prevLeftHeld: false, prevRightHeld: false, leftTapWindow: 0, rightTapWindow: 0,
+    prevLeftHeld: false, prevRightHeld: false, leftReleaseAge: null, rightReleaseAge: null,
     lastEvent: null, lastEventTimer: 0, runPhase: 0,
   };
 }

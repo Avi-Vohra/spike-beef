@@ -4,11 +4,29 @@ import { LEFT, RIGHT, JUMP, HIT, PLAYER_RADIUS, BALL_RADIUS } from './physics.js
 import { predictLandingPoint } from './ball.js';
 import { stepRandom } from './rng.js';
 
-// Pure, stateless jitter: a hash of (seed, tick, side) in [0,1). Same state
-// always gives the same value, but different seeds/ticks/sides vary it, so
-// CPU vs CPU matches aren't bit-for-bit identical across seeds.
+// Pure, stateless jitter: a hash of (seed, tick-bucket, side) in [0,1). Same
+// state always gives the same value, but different seeds/buckets/sides vary
+// it, so CPU vs CPU matches aren't bit-for-bit identical across seeds.
+//
+// Bucketed by JITTER_HOLD_TICKS rather than by the raw tick: a fresh random
+// value every single tick made the AI's target position chatter at up to
+// 60Hz, which — combined with the deadzone comparison below — made its
+// LEFT/RIGHT decision flip direction almost every tick near the boundary.
+// Measured directly: this alone caused ~0.5-0.7 ACCIDENTAL dive triggers
+// per point (dive.js double-tap detector firing on pure AI noise, not any
+// intended double-tap) and made the AI's own movement look twitchy. Holding
+// the jitter steady for a short stretch — matching how a real player's
+// judgment doesn't re-evaluate from scratch every 16ms either — fixes both.
+// Held long enough (~0.6s) to sit clearly outside a human double-tap's
+// natural timing window (dive.js's DOUBLE_TAP_MIN/MAX_GAP, ~0.07-0.3s) —
+// a shorter hold (originally 10 ticks/0.167s) aliased almost exactly into
+// that window, so every jitter-bucket transition was itself an accidental
+// "double tap" at the boundary, which is why that first attempt barely
+// reduced the accidental dive rate.
+const JITTER_HOLD_TICKS = 36;
 function jitterFor(state, side) {
-  const mixed = (state.rngSeed ^ Math.imul(state.tick, 2654435761) ^ Math.imul(side + 1, 40503)) >>> 0;
+  const bucket = Math.floor(state.tick / JITTER_HOLD_TICKS);
+  const mixed = (state.rngSeed ^ Math.imul(bucket, 2654435761) ^ Math.imul(side + 1, 40503)) >>> 0;
   return stepRandom(mixed)[0];
 }
 

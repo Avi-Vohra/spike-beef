@@ -161,37 +161,52 @@ export function run() {
     }
   }
 
-  // Test 6e: dive — double-tapping a direction while grounded triggers a
-  // fast lunge (not a single tap, not while charging), it expires on its
-  // own after DIVE_DURATION, and a cooldown blocks immediately re-diving.
-  // Ball contact while diving resolves as a weak defensive 'save', not a
-  // full attack.
+  // Test 6e: dive — double-tapping a direction while grounded (with a real
+  // human-timed gap between release and re-press) triggers a fast lunge;
+  // an instant same/next-tick flicker (bang-bang movement correction, which
+  // the AI and ordinary positioning adjustments do constantly) must NOT —
+  // that was a real bug: it fired ~45 times/match from normal AI movement
+  // alone before the min-gap requirement was added. Dive expires on its own
+  // after DIVE_DURATION, and a cooldown blocks immediately re-diving. Ball
+  // contact while diving resolves as a weak defensive 'save', not a full
+  // attack.
   {
-    const p = createPlayer(0);
     const dt = 1 / 60;
-    let started = updateDive(p, RIGHT, dt); // single tap: no dive yet
-    if (started || p.diving) fail('a single tap should not trigger a dive');
-    updateDive(p, 0, dt); // release
-    started = updateDive(p, RIGHT, dt); // second tap within the window: dive
-    if (!started || !p.diving) fail('a double-tap within the window should trigger a dive');
-    if (p.diveDir !== 1) fail(`dive direction should match the tapped direction: got ${p.diveDir}`);
+    function tapTwice(p, dir, gapTicks, ball) {
+      const bit = dir === 1 ? RIGHT : 1; // LEFT = 1
+      let started = updateDive(p, bit, dt, ball); // first press
+      updateDive(p, 0, dt, ball); // release
+      for (let i = 0; i < gapTicks; i++) updateDive(p, 0, dt, ball); // held release
+      started = updateDive(p, bit, dt, ball); // second press
+      return started;
+    }
 
+    const flickerP = createPlayer(0);
+    const flickerStarted = tapTwice(flickerP, 1, 0); // re-press on the very next tick
+    if (flickerStarted || flickerP.diving) {
+      fail('an instant flicker (no real gap between release and re-press) should NOT trigger a dive');
+    }
+
+    const realP = createPlayer(0);
+    const realStarted = tapTwice(realP, 1, 6); // ~0.1s gap: a real double-tap
+    if (!realStarted || !realP.diving) fail('a double-tap with a real human-timed gap should trigger a dive');
+    if (realP.diveDir !== 1) fail(`dive direction should match the tapped direction: got ${realP.diveDir}`);
+
+    const p = realP;
     let ticksToExpire = 0;
     while (p.diving && ticksToExpire < 60) { updateDive(p, 0, dt); ticksToExpire++; }
     if (p.diving) fail('dive should expire on its own after DIVE_DURATION');
 
     // Immediately double-tap again — should be blocked by the cooldown.
-    updateDive(p, RIGHT, dt);
-    updateDive(p, 0, dt);
-    const retrigger = updateDive(p, RIGHT, dt);
-    if (retrigger || p.diving) fail('diving again immediately after the first dive should be blocked by the cooldown');
+    tapTwice(p, 1, 6);
+    if (p.diving) fail('diving again immediately after the first dive should be blocked by the cooldown');
 
-    // A double-tap while charging should be ignored (charge takes priority).
+    // A real double-tap while charging should still be ignored (charge takes
+    // priority) — using a real gap so this fails ONLY because of charging,
+    // not because the min-gap also happened to reject it.
     const p2 = createPlayer(0);
     updateCharge(p2, HIT, dt);
-    updateDive(p2, RIGHT, dt);
-    updateDive(p2, 0, dt);
-    const divedWhileCharging = updateDive(p2, RIGHT, dt);
+    const divedWhileCharging = tapTwice(p2, 1, 6);
     if (divedWhileCharging || p2.diving) fail('double-tapping while charging should not trigger a dive');
 
     // Contact while diving is a 'save', not a full attack.
@@ -201,6 +216,22 @@ export function run() {
     const ball = createBall(p3.x, p3.y - 36);
     resolvePlayerHit(ball, ball.x, ball.y, p3, 0, []);
     if (p3.lastEvent !== 'save') fail(`contact while diving should produce a 'save' event, got '${p3.lastEvent}'`);
+
+    // A real double-tap should still be ignored if the ball is far away —
+    // diving is a reach for a ball you could plausibly get to, not a
+    // general-purpose movement burst. This also happens to suppress nearly
+    // all of the CPU's accidental triggers (see ai.js's JITTER_HOLD_TICKS
+    // comment) since those occur mostly while repositioning for a ball
+    // that's still far across the court.
+    const p4 = createPlayer(0);
+    const farBall = createBall(p4.x + 500, p4.y);
+    const divedFar = tapTwice(p4, 1, 6, farBall);
+    if (divedFar || p4.diving) fail('double-tapping should not trigger a dive when the ball is far away');
+
+    const p5 = createPlayer(0);
+    const nearBall = createBall(p5.x + 50, p5.y);
+    const divedNear = tapTwice(p5, 1, 6, nearBall);
+    if (!divedNear || !p5.diving) fail('double-tapping should trigger a dive when the ball is genuinely close');
   }
 
   // Test 7 (deep audit sim test): 200 seeded CPU vs CPU matches, medium vs medium.
@@ -215,6 +246,7 @@ export function run() {
     let totalRallies = 0;
     let maxRallyTicks = 0;
     let maxRestTicks = 0;
+    let diveCount = 0;
 
     for (let seed = 1; seed <= NUM_MATCHES; seed++) {
       let state = createInitialState(seed);
@@ -245,6 +277,8 @@ export function run() {
         lastBallX = state.ball.x;
         lastBallY = state.ball.y;
 
+        for (const e of events) if ((typeof e === 'string' ? e : e.type) === 'dive') diveCount++;
+
         const pointEvent = events.find((e) => e.type === 'point');
         if (pointEvent) {
           maxRallyTicks = Math.max(maxRallyTicks, rallyTickCount);
@@ -264,6 +298,17 @@ export function run() {
 
     if (maxRestTicks > 120) fail(`ball rested too long: ${maxRestTicks} ticks (> 2s)`);
     if (maxRallyTicks > RALLY_TICK_CAP) fail(`rally exceeded 60s: ${maxRallyTicks} ticks`);
+
+    // Regression guard: dive.js's double-tap detector once fired on pure AI
+    // movement noise (measured ~47 accidental dives/match before the
+    // min-gap + jitter-smoothing + ball-proximity fixes). A healthy rate
+    // here is "rare, occasional" — a generous ceiling catches any future
+    // regression back toward "constant" without being flaky about the
+    // exact number.
+    const divesPerMatch = diveCount / NUM_MATCHES;
+    if (divesPerMatch > 15) {
+      fail(`dive is firing far too often (${divesPerMatch.toFixed(1)}/match) — likely an accidental-trigger regression, see DECISIONS.md`);
+    }
 
     // Win share is a NOTE, not a hard failure, as of the charge-hit redesign:
     // "winner serves next" plus a real (not huge, but nonzero) per-point

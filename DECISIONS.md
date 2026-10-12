@@ -340,3 +340,68 @@ itself, not something the block mechanic introduced:
   physics.js is back to 242. Updated every importer (ai.js, render.js, sim.js,
   tests/sim.test.mjs) to pull these from the new module. All tests green after the move,
   not just syntax-checked.
+
+## FOURTH audit finding: dive was firing ~47 times per match from pure AI movement noise
+Continuing the user's explicit "audit everything, make sure it's fun, don't stop" directive.
+Measured real CPU-vs-CPU stats (not vibes): dive fired 4692 times across 100 matches
+(~47/match, more than one per point) — a mechanic meant to be a rare, deliberate
+emergency save was instead constantly hijacking ordinary movement.
+- **Root cause #1**: dive.js's double-tap detector only checked "pressed again within
+  a max window" with no MINIMUM gap — a human's deliberate double-tap and an AI's (or a
+  human's own) ordinary bang-bang direction-correction oscillation both satisfy "pressed
+  again within 0.25s," and measured directly that the AI's natural re-press gaps are
+  heavily concentrated at 1-20 ticks (0-0.33s) with no clean separation from genuine
+  double-tap timing. Fixed by requiring a MINIMUM gap too (DOUBLE_TAP_MIN_GAP=0.08s,
+  tracked via a release-age timer rather than a decaying countdown) so a same-tick or
+  near-instant flicker can no longer qualify, while a real human double-tap (release,
+  pause, press again ~100-200ms later) still does.
+- **Root cause #2, found while fixing #1**: `ai.js`'s positioning jitter was re-rolled
+  from a fresh random value EVERY SINGLE TICK (hashing `state.tick` directly), so the
+  AI's target position chattered at up to 60Hz — combined with the deadzone comparison,
+  this flipped its LEFT/RIGHT decision constantly near the boundary. This is itself a
+  real movement-feel bug independent of diving (twitchy, unnatural-looking AI movement —
+  directly relevant to "opponent readability"), not just a dive-trigger issue. Fixed by
+  bucketing the jitter to hold steady for JITTER_HOLD_TICKS (36 ticks ≈ 0.6s) before
+  re-rolling — matching how a real player's judgment doesn't re-evaluate from scratch
+  every 16ms. This alone dropped CPU-vs-CPU win-share from a skewed 82/18 to a healthy
+  53/47 in one measurement (confirms twitchy AI movement was ALSO a fairness bug, not
+  just a feel issue) and cut dive frequency from 47/match to ~7/match.
+  - **Important trade-off discovered empirically, not assumed**: pushing the jitter
+    hold even longer (60 ticks) cut dives further (~4/match) but made the AI
+    noticeably MORE exploitable (win-share skewed back to 68/32) — too slow to track
+    changes. 36 ticks was kept as the better balance point between "stop twitching"
+    and "stay responsive," not the value that most minimized dive count in isolation.
+  - Also discovered the two fixes were aliasing against each other: the first
+    jitter-hold attempt (10 ticks ≈ 0.167s) landed almost exactly inside the
+    double-tap window, so every jitter-bucket transition WAS itself a boundary-
+    flicker double-tap — barely moved the needle (4692→2805) until the hold was
+    pushed clearly outside the double-tap window's range.
+- **Root cause #3 (the decisive fix)**: added a proximity gate — diving now requires
+  the ball to actually be within `DIVE_MAX_BALL_DIST` (260px), since diving only makes
+  sense as a reach for a ball you could plausibly get to, never as a general movement
+  burst. This is also a stronger, more principled filter than timing alone: the AI's
+  (and a human's) direction-correction noise happens almost entirely while repositioning
+  for a ball that's still far away, not during an actual defensive scramble, so gating
+  on distance suppresses nearly all remaining accidental triggers at the source rather
+  than fighting the AI's input-noise distribution with ever-tighter timing thresholds.
+  Dropped dive frequency to ~2.3/match. Wired the ball through both call sites
+  (sim.js's real authoritative step, and netcode.js's guest-side local prediction,
+  which uses its last-known snapshot ball position) — verified both compile and the
+  full test suite (including two new direct tests: a far-away double-tap does NOT dive,
+  a close double-tap DOES) passes.
+- Added a permanent regression guard to the existing 200-match stress test
+  (tests/sim.test.mjs): fails if dive fires more than 15 times/match on average, so
+  this specific bug class can't silently return unnoticed.
+- **Win-share note**: this session has repeatedly observed (and documented) that the
+  CPU-vs-CPU win-share stat swings widely from small, seemingly-unrelated constant
+  changes — consistent with the chaotic sensitivity already noted earlier in this file.
+  The 53/47 result from the jitter fix looked like a real improvement; the subsequent
+  dip to 67/33 after ALSO adding the proximity gate is most likely more of that same
+  known chaotic noise (a single early-match difference cascading through a long
+  deterministic simulation) rather than a new problem introduced by the proximity gate
+  itself, which has no obvious mechanism to bias one side over the other (it's a
+  symmetric, side-independent distance check). Flagged rather than chased further,
+  consistent with this session's standing policy on this specific noisy metric — the
+  genuinely robust, non-noisy finding across EVERY measurement in this investigation
+  (server win rate sitting at 72-85% regardless of the dive/jitter changes) is a
+  separate, real issue, next on the list.

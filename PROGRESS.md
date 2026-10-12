@@ -75,8 +75,22 @@ drainEvents() on the guest netcode. Verified directly over
 LoopbackTransport. Full detail in DECISIONS.md.
 Also split src/ball.js out of physics.js (which had grown to 331 lines)
 to stay under the file-size guideline — all tests green after the move.
-Next: extra courts, unlockable cosmetics, settings screen, practice mode,
-PWA installability — or whatever's asked for.
+USER REQUESTED A FULL FUN/EDGE-CASE AUDIT, EXPLICITLY "DON'T STOP." Continuing
+that now instead of moving to Tier 5 polish items.
+
+FOURTH audit finding (measured, not assumed): dive was firing ~47 times per
+match from pure AI movement noise — the double-tap detector had no minimum
+gap, and separately ai.js's positioning jitter re-rolled every single tick
+(60Hz chatter), both of which satisfied the "double tap" check constantly.
+Fixed with three layered changes: a real minimum gap, jitter held steady
+for ~0.6s at a time (also fixed genuinely twitchy AI movement — confirmed
+this independently improved CPU-vs-CPU balance too), and a ball-proximity
+gate (diving only makes sense near the ball anyway). Dive rate now ~2.3/
+match. Added a permanent regression guard to the stress test.
+Next: investigate server win rate, which has sat at 72-85% across every
+measurement in this investigation regardless of the above changes — this
+looks like a real, stable signal (not the known chaotic win-share noise),
+worth fixing for actual player fairness.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

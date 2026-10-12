@@ -155,7 +155,7 @@ export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) 
     // locally, even though the actual hit resolves correctly on the host
     // (which runs the real sim off the raw input bits this sends above).
     updateCharge(predictedSelf, localInput, DT);
-    updateDive(predictedSelf, localInput, DT);
+    updateDive(predictedSelf, localInput, DT, lastSnapshot ? lastSnapshot.ball : null);
     for (let s = 0; s < SUBSTEPS; s++) stepPlayer(predictedSelf, localInput, DT / SUBSTEPS);
   }
 
