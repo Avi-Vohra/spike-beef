@@ -1,4 +1,5 @@
 import { createInitialState, step } from './sim.js';
+import { WIDTH, HEIGHT } from './physics.js';
 import { render, renderIdle } from './render.js';
 import * as fx from './fx.js';
 import { createKeyboardInput, createTouchInput } from './input.js';
@@ -308,8 +309,11 @@ function frame(now) {
   setTauntBarVisible(appScreen === 'match');
   if (state && (appScreen === 'match' || appScreen === 'paused' || appScreen === 'matchEnded' || appScreen === 'replay' || appScreen === 'forfeitResult')) {
     const shake = fx.getShakeOffset();
+    const punchScale = fx.getPunchScale();
     ctx.save();
-    ctx.translate(shake.x, shake.y);
+    ctx.translate(WIDTH / 2 + shake.x, HEIGHT / 2 + shake.y);
+    ctx.scale(punchScale, punchScale);
+    ctx.translate(-WIDTH / 2, -HEIGHT / 2);
     render(ctx, state, spin, now / 1000, emoteState, bannerState.text, online ? online.getSilentMs() : null, fx.getNetSway());
     fx.draw(ctx);
     ctx.restore();

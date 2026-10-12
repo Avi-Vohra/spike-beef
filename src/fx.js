@@ -6,10 +6,18 @@ let shakeTime = 0;
 let shakeMag = 0;
 let netSway = 0;
 let netSwayVel = 0;
+let punchMag = 0; // extra camera scale (0 = no zoom), decays toward 0
 
 export function triggerShake(mag, duration = 0.15) {
   shakeMag = Math.max(shakeMag, mag);
   shakeTime = Math.max(shakeTime, duration);
+}
+
+// A brief camera punch-in on the hardest hits — the "feel" equivalent of
+// hit-stop for the camera. Kept subtle (callers pass ~0.02-0.05) so it reads
+// as impact emphasis, not a jarring zoom.
+export function triggerPunch(mag) {
+  punchMag = Math.max(punchMag, mag);
 }
 
 export function triggerNetSway(amount) {
@@ -54,6 +62,10 @@ export function update(dt) {
   netSwayVel -= netSway * 90 * dt;
   netSwayVel *= 0.88;
 
+  // Punch-zoom: fast exponential decay back to 1x (~0.1s to mostly settle).
+  punchMag = Math.max(0, punchMag - punchMag * 14 * dt);
+  if (punchMag < 0.002) punchMag = 0;
+
   const GRAVITY_FX = 500;
   particles = particles.filter((p) => p.life > 0);
   for (const p of particles) {
@@ -65,6 +77,7 @@ export function update(dt) {
 }
 
 export function getNetSway() { return netSway; }
+export function getPunchScale() { return 1 + punchMag; }
 
 export function getShakeOffset() {
   if (shakeTime <= 0 || shakeMag <= 0) return { x: 0, y: 0 };
@@ -89,4 +102,5 @@ export function reset() {
   shakeMag = 0;
   netSway = 0;
   netSwayVel = 0;
+  punchMag = 0;
 }

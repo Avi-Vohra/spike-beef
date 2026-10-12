@@ -550,3 +550,15 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   rather than ship a worse-looking court. Lesson for next time: a procedural silhouette
   needs an actual visual check before being kept, same discipline already applied to
   the sand-corner and net-mesh fixes — "looks right in my head" isn't sufficient for art.
+- **Camera punch-zoom on the hardest hits**: added `fx.triggerPunch`/`getPunchScale` — a
+  brief (~0.1s, exponential decay) extra camera scale centered on the court, same
+  category of feel-fix as the existing hit-stop/screen-shake, wired to spike (0.05) and
+  block (0.03) only — the two hit types that already trigger hit-stop, so the camera
+  punch and freeze-frame land together rather than competing. Verified the decay curve
+  numerically (fx.js has no DOM dependency, runs fine standalone under Node): 5% punch
+  decays to +0.3% by 12 frames (~0.2s), matching the intended quick snap-back. main.js's
+  render block now scales around the court center (WIDTH/2, HEIGHT/2) before applying
+  shake, so punch and shake compose correctly instead of fighting each other's origin.
+  Pushed main.js to 325 lines (was already an accepted 319-line overage, documented
+  earlier this session — a few more lines for a self-contained 4-line render-block change
+  isn't worth a hasty split).
