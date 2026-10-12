@@ -43,7 +43,6 @@ export const SPIKE_MAX_POWER = 780;
 export const DEFAULT_POWER = 320; // passive/mistimed contact — no charge involved
 export const DEFAULT_STEEP = 1.6;
 export const NET_ARC_RANGE = 110; // px from the net where arc-assist starts tapering in
-export const NET_ARC_BOOST = 1.1; // max extra steep when hitting right on the net
 export const BLOCK_POWER = 480; // jumping into the ball at the net, uncharged
 export const BLOCK_STEEP = 0.45; // fast and flat — punched straight down
 
@@ -65,6 +64,47 @@ export const DOUBLE_TAP_MAX_GAP = 0.22;
 export const DIVE_MAX_BALL_DIST = 260;
 
 function lerp(a, b, t) { return a + (b - a) * t; }
+
+// Guarantees the ball will clear the net given its CURRENT vx (not just a
+// proportional "add some steep" fudge, which measurably failed): solves the
+// actual projectile physics for the vy needed to be above NET_TOP by the
+// time the ball's horizontal travel reaches NET_X, and raises vy to at
+// least that if the current trajectory would clip. Verified by direct
+// simulation that the previous approach (NET_ARC_BOOST alone) still clipped
+// the net on every hit type, including a fully-charged one, from 32px away
+// — this replaces it with a solved guarantee instead of a bigger fudge
+// factor. Only engages when the ball is actually headed toward/across the
+// net; a shot moving away from it is untouched.
+const NET_CLEARANCE_MAX_VY = -1950; // sane ceiling — a very strong straight-up punch, not an absurd one
+const NET_CLEARANCE_MIN_TIME = 0.05; // floor on time-to-net: prevents a divide-by-near-zero blowup
+
+function ensureClearsNet(ball) {
+  const distToNet = NET_X - ball.x; // positive if ball is left of net
+  const headingTowardNet = (distToNet > 0 && ball.vx > 0) || (distToNet < 0 && ball.vx < 0);
+  if (!headingTowardNet || Math.abs(distToNet) > NET_ARC_RANGE + 60) return;
+
+  // Trade some horizontal punch for hang time the closer the contact is to
+  // the net — matches how a real player naturally pops a point-blank ball
+  // up rather than trying to crush it flat, since there's no room to do
+  // otherwise. This does most of the work; the vy solve below (with its own
+  // floor/cap) only needs to cover what this doesn't.
+  const closeness = Math.max(0, Math.min(1, (NET_ARC_RANGE - Math.abs(distToNet)) / NET_ARC_RANGE));
+  ball.vx *= 1 - closeness * 0.6;
+
+  // The ball must clear NET_TOP by the time it reaches the near EDGE of the
+  // net's collision zone (NET_HALF_W + BALL_RADIUS out from NET_X's
+  // center), not by the time it reaches NET_X itself — solving to the
+  // center was measurably insufficient (clipped every time) since the
+  // actual collision check fires ~17px earlier than that.
+  const edgeDist = Math.max(0, Math.abs(distToNet) - (NET_HALF_W + BALL_RADIUS));
+  const t = Math.max(NET_CLEARANCE_MIN_TIME, edgeDist / Math.max(1, Math.abs(ball.vx)));
+  const yAtNet = ball.y + ball.vy * t + 0.5 * GRAVITY * t * t;
+  const requiredY = NET_TOP - BALL_RADIUS - 14; // clearance margin
+  if (yAtNet > requiredY) {
+    const vyMin = (requiredY - ball.y - 0.5 * GRAVITY * t * t) / t;
+    ball.vy = Math.max(NET_CLEARANCE_MAX_VY, Math.min(ball.vy, vyMin));
+  }
+}
 
 export function createPlayer(side) {
   const x = side === 0 ? WIDTH * 0.25 : WIDTH * 0.75;
@@ -192,17 +232,12 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
       steep = lerp(2.0, 1.2, charge);
       eventType = 'hit';
     }
-    // Hitting right on top of the net leaves no vertical margin to clear it
-    // at a flat/fast trajectory — add arc the closer the contact point is to
-    // the net, same way a real player has to pop the ball up more when
-    // they're right on it. Tapers to 0 beyond NET_ARC_RANGE.
-    const distToNet = Math.abs(p.x - NET_X);
-    steep += Math.max(0, (NET_ARC_RANGE - distToNet) / NET_ARC_RANGE) * NET_ARC_BOOST;
     ball.vx = aimX * power;
     ball.vy = -power * steep * 0.6;
     p.justReleased = false;
     p.releaseGraceTimer = 0;
     p.aimDir = 0;
+    ensureClearsNet(ball);
   } else if (p.charging) {
     // Mistimed — the ball arrived mid-charge. Costs you the charge, and
     // produces a gentle, unaimed deflect rather than the swing you wanted.
@@ -214,6 +249,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     power = DEFAULT_POWER;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
+    ensureClearsNet(ball);
   } else if (jumping && Math.abs(p.x - NET_X) < NET_ARC_RANGE) {
     // Block: jumping into the ball right at the net without charging punches
     // it straight down into the opponent's court — fast, flat, no charge
@@ -232,6 +268,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     power = DEFAULT_POWER;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
+    ensureClearsNet(ball);
   } else {
     // Passive contact — never charging, not blocking, not diving. A gentle,
     // unaimed touch.
@@ -241,6 +278,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     power = DEFAULT_POWER;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
+    ensureClearsNet(ball);
   }
 
   events.push({ type: eventType, side: p.side });

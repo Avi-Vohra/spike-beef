@@ -87,10 +87,27 @@ for ~0.6s at a time (also fixed genuinely twitchy AI movement — confirmed
 this independently improved CPU-vs-CPU balance too), and a ball-proximity
 gate (diving only makes sense near the ball anyway). Dive rate now ~2.3/
 match. Added a permanent regression guard to the stress test.
-Next: investigate server win rate, which has sat at 72-85% across every
-measurement in this investigation regardless of the above changes — this
-looks like a real, stable signal (not the known chaotic win-share noise),
-worth fixing for actual player fairness.
+FIFTH audit finding (the big one): investigated that stable server-win-rate
+signal — root cause was that hits from close to the net (the realistic ~32px
+range observed in real matches) PHYSICALLY could not clear it, even fully
+charged, because the old arc-boost was a fudge factor applied to only one
+branch (passive touches got zero net help at all). The receiver kept
+clipping the net and faulting out on repeated touches, handing the server a
+free point without the server ever touching the ball. Replaced the fudge
+with `ensureClearsNet`, which SOLVES the actual projectile physics for the
+vy needed to clear, plus a proximity-scaled horizontal-power reduction.
+Found and fixed two real bugs building the fix itself (an infinite-blowup
+divide-by-near-zero, and solving to the net's center instead of its
+collision edge) via tests failing against the fix's own first draft, not by
+inspection. Measured before/after: server win rate 72-85% -> 40-61%,
+average rally length 2.8-3.3 -> 3.3-5.5 hits, and the rallyHits distribution
+for both server/receiver wins went from a suspicious 77%-spike at exactly 3
+touches to a smooth, organic-looking spread. Likely the single highest-
+value fix of this whole audit pass.
+Split tests/sim.test.mjs (hit 401 lines) into itself + tests/stress.test.mjs.
+Next: continue the audit per the "don't stop" directive — re-assess what's
+now the single biggest remaining weakness (visual/feel polish, or further
+balance, or an unexplored edge-case category from the original brief).
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

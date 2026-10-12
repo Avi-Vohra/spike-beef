@@ -405,3 +405,66 @@ emergency save was instead constantly hijacking ordinary movement.
   genuinely robust, non-noisy finding across EVERY measurement in this investigation
   (server win rate sitting at 72-85% regardless of the dive/jitter changes) is a
   separate, real issue, next on the list.
+
+## FIFTH audit finding (the big one): the net genuinely could not be cleared from close range
+Investigated the stable server-win-rate signal (72-85% across every measurement above,
+unlike the noisy match-level win-share stat). Traced a real match point-by-point:
+rallyHits for server-won points were 77% CONCENTRATED at exactly 3 — far too specific
+to be organic variety. Root cause, confirmed by direct simulation, not assumed: the
+RECEIVER kept clipping the net on their return and racking up consecutive touches
+until faulting out (4th-touch fault), handing the server a free point without the
+server doing anything. The server player's x position literally never moved during
+these rallies — they never got to touch the ball at all.
+- **Confirmed the actual physics failure directly**: simulated a hit from 32px off the
+  net (the real observed distance from the match trace) and found it clips the net
+  regardless of hit type — including a FULLY CHARGED hit with the existing
+  NET_ARC_BOOST applied. The old approach (`steep += proportional-boost`) was a
+  fudge-factor tweak, not a solved guarantee, and measurably wasn't enough. Also found
+  the old boost ONLY applied inside the charged-hit branch — passive 'touch'/'fumble'
+  contacts (common during fast exchanges, and exactly what the receiver was stuck
+  making) got ZERO net assistance at all, using a fixed DEFAULT_STEEP regardless of
+  proximity.
+- **The fix, built properly rather than another fudge-factor**: added `ensureClearsNet`
+  — solves the actual projectile-motion physics for the vy needed to be above net
+  height by the time the ball's horizontal travel reaches the net's collision-zone
+  EDGE (not its center — an early version of this fix solved to the wrong point and
+  was still short), and raises vy to at least that if the current trajectory would
+  clip. Combined with a horizontal-power reduction scaled by proximity (up to 60% at
+  point-blank — trading punch for hang-time, matching how a real player naturally pops
+  a point-blank ball up rather than crushing it flat, since physically there's no room
+  to do otherwise). Applied uniformly to every branch that aims at the opponent (hit/
+  spike/tip via the charged path, fumble, touch, save) — NOT to block, which already
+  has its own correct near-net behavior by design.
+- **Two real bugs found and fixed WHILE building this fix, not before shipping it**:
+  (1) The naive vy-solve blows up toward negative infinity as distance-to-net
+  approaches 0 (dividing by an near-zero time). Fixed with both a time floor
+  (NET_CLEARANCE_MIN_TIME=0.05s, preventing the asymptotic blowup) and a final sanity
+  cap (NET_CLEARANCE_MAX_VY=-1950, a strong-but-not-absurd ceiling) — caught by an
+  actual test producing vy=-8200 before the floor/cap existed, not by inspection.
+  (2) Solving to the net's CENTER (distance 0 from NET_X) rather than its collision
+  EDGE (NET_HALF_W+BALL_RADIUS=17px out) meant the solved vy was for clearing ~17px
+  later than the real collision check actually fires — insufficient by exactly that
+  margin. Found by re-simulating substep-by-substep after the first version still
+  failed its own test, not by re-deriving the math on paper.
+- **Explicitly accepted, not silently papered over**: literally 5px from the net (the
+  player almost touching it) remains a genuinely hard edge case where even the solved
+  guarantee, floored and capped, may still clip — matches real volleyball (a player
+  jammed right against the net has no real recourse either). The test for this
+  distance checks it resolves to SOMETHING (no NaN/hang), not that it always clears.
+- **Measured impact, before vs after** (100-match CPU-vs-CPU samples): server win rate
+  72-85% (stable across many unrelated prior changes) → 40-61% (receiver now has a
+  modest, explicable edge instead of the server having a dominant one). Average rally
+  length 2.8-3.3 hits → 3.3-5.5 hits (rallies are measurably longer and healthier — the
+  200-match test's own rallyHits distribution for both server-wins and receiver-wins is
+  now spread smoothly across many lengths with a gentle peak at 4-6, replacing the
+  previous suspicious 77%-concentration spike at exactly 3). This is very likely the
+  single highest-value fix of this entire audit pass — it was quietly deciding a large
+  fraction of every match via an unfair, unreadable mechanism (the server never even
+  touched the ball; the point was decided by the receiver's own forced fault).
+- Split the growing `tests/sim.test.mjs` (hit 401 lines) into itself (unit-level physics/
+  charge/dive/net-clearance checks, 290 lines) and a new `tests/stress.test.mjs`
+  (the 200-match CPU-vs-CPU statistics test + difficulty sanity check, 118 lines) —
+  same pattern as the earlier `tests/run.mjs` split this session. Also bumped the
+  per-match tick budget in tests from 8 to 12 simulated minutes, since healthier/longer
+  rallies legitimately push some close matches past the old budget — a real, good
+  consequence of the fix, not something to paper over by cutting rallies short again.
