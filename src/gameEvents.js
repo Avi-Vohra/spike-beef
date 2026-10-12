@@ -37,15 +37,19 @@ export function processEvents(events, ball, matchBefore = null, players = null) 
   for (const ev of events) {
     const type = typeof ev === 'string' ? ev : ev.type;
     playEvent(type);
-    if (type === 'tip') { fx.spawnImpact(ball.x, ball.y, 300); vibrate(10); }
-    else if (type === 'hit') { fx.spawnImpact(ball.x, ball.y, 480); vibrate(15); hitStop = Math.max(hitStop, 0.03); }
+    // Particle bursts aim along the ball's OUTGOING direction (its velocity
+    // right after this hit resolved) instead of a generic all-directions
+    // splash — reads as "flung that way" rather than a firework.
+    const outAngle = Math.atan2(ball.vy, ball.vx);
+    if (type === 'tip') { fx.spawnImpact(ball.x, ball.y, 300, outAngle); vibrate(10); }
+    else if (type === 'hit') { fx.spawnImpact(ball.x, ball.y, 480, outAngle); vibrate(15); hitStop = Math.max(hitStop, 0.03); }
     else if (type === 'spike') {
-      fx.spawnImpact(ball.x, ball.y, 750); vibrate(25); hitStop = Math.max(hitStop, 0.07);
+      fx.spawnImpact(ball.x, ball.y, 750, outAngle); vibrate(25); hitStop = Math.max(hitStop, 0.07);
       fx.triggerPunch(0.05);
       stats.recordHitEvent(type, ev.side);
     } else if (type === 'fumble') { fx.spawnImpact(ball.x, ball.y, 150); }
-    else if (type === 'block') { fx.spawnImpact(ball.x, ball.y, 550); vibrate(20); hitStop = Math.max(hitStop, 0.05); fx.triggerPunch(0.03); }
-    else if (type === 'save') { fx.spawnImpact(ball.x, ball.y, 250); vibrate(10); }
+    else if (type === 'block') { fx.spawnImpact(ball.x, ball.y, 550, outAngle); vibrate(20); hitStop = Math.max(hitStop, 0.05); fx.triggerPunch(0.03); }
+    else if (type === 'save') { fx.spawnImpact(ball.x, ball.y, 250, outAngle); vibrate(10); }
     else if (type === 'dive') {
       vibrate(8);
       if (players && players[ev.side]) fx.spawnSandPuff(players[ev.side].x, GROUND_Y);

@@ -24,9 +24,15 @@ export function triggerNetSway(amount) {
   netSwayVel += amount;
 }
 
-function spawn(x, y, count, color, speed, life, size) {
+// `baseAngle`/`spread` bias the burst into a cone instead of a full radial
+// splash — a hit should read as "flung that way," not a generic firework.
+// Omitting them keeps the old uniform 360° burst (used where there's no
+// single clear direction, e.g. a mistimed fumble).
+function spawn(x, y, count, color, speed, life, size, baseAngle = null, spread = Math.PI * 2) {
   for (let i = 0; i < count && particles.length < MAX_PARTICLES; i++) {
-    const angle = Math.random() * Math.PI * 2;
+    const angle = baseAngle === null
+      ? Math.random() * Math.PI * 2
+      : baseAngle + (Math.random() - 0.5) * spread;
     const s = speed * (0.4 + Math.random() * 0.6);
     particles.push({
       x, y, vx: Math.cos(angle) * s, vy: Math.sin(angle) * s - speed * 0.3,
@@ -35,9 +41,9 @@ function spawn(x, y, count, color, speed, life, size) {
   }
 }
 
-export function spawnImpact(x, y, power) {
+export function spawnImpact(x, y, power, angle = null) {
   const intensity = Math.min(1, power / 700);
-  spawn(x, y, 4 + Math.round(intensity * 8), '#fff6e0', 80 + intensity * 220, 0.28 + intensity * 0.15, 4);
+  spawn(x, y, 4 + Math.round(intensity * 8), '#fff6e0', 80 + intensity * 220, 0.28 + intensity * 0.15, 4, angle, 2.0);
   if (intensity > 0.4) triggerShake(2 + intensity * 7, 0.08 + intensity * 0.1);
 }
 

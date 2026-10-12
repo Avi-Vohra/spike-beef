@@ -613,3 +613,10 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   point that resolves a hit in physics.js, the most relevant spot for "hit graphics."
   Verified via zoomed screenshot before keeping (same discipline as every other art
   change this session) — reads as rounded limb ends, not a separate/floating shape.
+- **Directional impact particles**: `fx.spawnImpact` now accepts an optional angle to
+  bias its particle burst into a cone (±~115°) around the ball's actual outgoing
+  velocity direction after a hit, instead of always splashing uniformly in all 360°.
+  Wired through gameEvents.js using `Math.atan2(ball.vy, ball.vx)` on the post-hit ball
+  state for tip/hit/spike/block/save. Fumble stays radial (no single clear "good"
+  direction — matches its "weak unaimed deflect" flavor). Verified fx.js still runs
+  standalone under Node (no DOM dependency) with no crash on the new angle param.
