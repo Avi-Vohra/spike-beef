@@ -599,3 +599,10 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   gradient on a stroked shape. Verified visually via a zoomed screenshot before keeping
   it (same discipline as the reverted palm-tree attempt) — reads as a subtle highlight,
   not distracting.
+- **Spike was too cheap**: `SPIKE_MIN_CHARGE` (0.12) was BELOW `TIP_CHARGE_THRESHOLD`
+  (0.15) — a barely-charged tap in the air already qualified as a full-power spike, the
+  same charge level that only produces a weak tip on the ground. Measured before fixing:
+  3433 spikes vs 4408 regular hits across 40 CPU-vs-CPU matches — the supposedly-hardest,
+  highest-commitment shot firing almost as often as an ordinary one. Raised to 0.3 (a
+  real, deliberate charge). Re-measured after: spikes 2842 (down ~17%), hits 4479 (up
+  slightly), rally length basically unchanged (5.02 -> 4.84). Full test suite still PASS.

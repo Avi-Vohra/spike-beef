@@ -31,7 +31,15 @@ export const HIT = 8;
 // charge a swing, steer with LEFT/RIGHT while charging, release to swing.
 export const CHARGE_SECONDS = 0.6;
 export const TIP_CHARGE_THRESHOLD = 0.15; // below this, release = a quick weak tip
-export const SPIKE_MIN_CHARGE = 0.12; // minimum charge for a jump-release to count as a spike
+// Minimum charge for a jump-release to count as a spike. Was 0.12 — BELOW
+// TIP_CHARGE_THRESHOLD, which meant a barely-charged tap (the same charge
+// that produces a weak tip on the ground) already counted as a full-power
+// spike in the air: measured 3433 spikes vs 4408 regular hits across 40
+// CPU-vs-CPU matches, meaning the supposedly-hardest, highest-commitment
+// shot was firing almost as often as an ordinary hit. Raised so a spike
+// needs a real, deliberate charge — same floor philosophy as the hit tier,
+// not a near-freebie off any jump + tap.
+export const SPIKE_MIN_CHARGE = 0.3;
 export const NEAR_PEAK_VY = 300;
 export const HIT_COOLDOWN = 0.18;
 // How long after releasing HIT the swing stays "live" and able to connect.
