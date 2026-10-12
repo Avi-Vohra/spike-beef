@@ -28,6 +28,12 @@ export const TIP_CHARGE_THRESHOLD = 0.15; // below this, release = a quick weak 
 export const SPIKE_MIN_CHARGE = 0.12; // minimum charge for a jump-release to count as a spike
 export const NEAR_PEAK_VY = 300;
 export const HIT_COOLDOWN = 0.18;
+// How long after releasing HIT the swing stays "live" and able to connect.
+// Without this, a release only counts if ball contact happens in the exact
+// same 1/60s tick as the release edge — nearly impossible for a human (or
+// an AI releasing a few ticks early to lead the ball) to hit reliably, so
+// almost every real-world release was silently wasting its whole charge.
+export const RELEASE_GRACE_SECONDS = 0.15;
 
 export const TIP_POWER = 300;
 export const MIN_CHARGE_POWER = 360;
@@ -38,6 +44,8 @@ export const DEFAULT_POWER = 320; // passive/mistimed contact — no charge invo
 export const DEFAULT_STEEP = 1.6;
 export const NET_ARC_RANGE = 110; // px from the net where arc-assist starts tapering in
 export const NET_ARC_BOOST = 1.1; // max extra steep when hitting right on the net
+export const BLOCK_POWER = 480; // jumping into the ball at the net, uncharged
+export const BLOCK_STEEP = 0.45; // fast and flat — punched straight down
 
 function lerp(a, b, t) { return a + (b - a) * t; }
 
@@ -46,6 +54,7 @@ export function createPlayer(side) {
   return {
     side, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
     charging: false, charge: 0, aimDir: 0, justReleased: false, releaseCharge: 0,
+    releaseGraceTimer: 0,
     lastEvent: null, lastEventTimer: 0, runPhase: 0,
   };
 }
@@ -61,8 +70,12 @@ function playerBounds(side) {
 
 // Charge/release state machine — runs once per full tick (not per sub-step):
 // holding HIT ramps charge and steers aimDir from LEFT/RIGHT; releasing HIT
-// (detected via the `charging` flag itself going true->false) sets
-// justReleased for exactly this tick, consumed by resolvePlayerHit below.
+// (detected via the `charging` flag itself going true->false) opens a short
+// RELEASE_GRACE_SECONDS window (releaseGraceTimer) during which ball contact
+// still resolves as the charged swing — see resolvePlayerHit below. Without
+// this window the swing only connects if contact happens in the exact same
+// tick as the release edge, which is unrealistic for both human timing and
+// an AI that releases a few ticks early to lead a moving ball.
 export function updateCharge(p, input, dt) {
   p.justReleased = false;
   const hitHeld = !!(input & HIT);
@@ -72,9 +85,11 @@ export function updateCharge(p, input, dt) {
   } else if (p.charging) {
     p.justReleased = true;
     p.releaseCharge = p.charge;
+    p.releaseGraceTimer = RELEASE_GRACE_SECONDS;
     p.charging = false;
     p.charge = 0;
   }
+  if (p.releaseGraceTimer > 0) p.releaseGraceTimer -= dt;
   if (p.lastEventTimer > 0) p.lastEventTimer -= dt;
   else p.lastEvent = null;
 }
@@ -227,7 +242,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   const dirX = p.side === 0 ? 1 : -1;
   let power, steep, eventType;
 
-  if (p.justReleased) {
+  if (p.releaseGraceTimer > 0) {
     const charge = p.releaseCharge;
     const aimX = p.aimDir !== 0 ? p.aimDir : dirX;
     if (charge >= SPIKE_MIN_CHARGE && jumping && nearPeak) {
@@ -252,17 +267,30 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     ball.vx = aimX * power;
     ball.vy = -power * steep * 0.6;
     p.justReleased = false;
+    p.releaseGraceTimer = 0;
     p.aimDir = 0;
+  } else if (p.charging) {
+    // Mistimed — the ball arrived mid-charge. Costs you the charge, and
+    // produces a gentle, unaimed deflect rather than the swing you wanted.
+    p.charging = false;
+    p.charge = 0;
+    eventType = 'fumble';
+    const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
+    const aimX = inputDirX !== 0 ? inputDirX : dirX;
+    power = DEFAULT_POWER;
+    ball.vx = aimX * power;
+    ball.vy = -power * DEFAULT_STEEP * 0.6;
+  } else if (jumping && Math.abs(p.x - NET_X) < NET_ARC_RANGE) {
+    // Block: jumping into the ball right at the net without charging punches
+    // it straight down into the opponent's court — fast, flat, no charge
+    // commitment needed, but only works this close to the net.
+    eventType = 'block';
+    power = BLOCK_POWER;
+    ball.vx = dirX * power;
+    ball.vy = -power * BLOCK_STEEP * 0.6;
   } else {
-    // Mistimed (ball arrived mid-charge) or passive (never charging) contact
-    // — a gentle, unaimed-by-charge deflect. Mistiming costs you the charge.
-    if (p.charging) {
-      p.charging = false;
-      p.charge = 0;
-      eventType = 'fumble';
-    } else {
-      eventType = 'touch';
-    }
+    // Passive contact — never charging, not blocking. A gentle, unaimed touch.
+    eventType = 'touch';
     const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
     const aimX = inputDirX !== 0 ? inputDirX : dirX;
     power = DEFAULT_POWER;

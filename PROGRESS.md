@@ -52,8 +52,22 @@ TIER 4 FULLY COMPLETE too (net sway, animated sea wave, CSS screen
 transitions closed out the last 3 partial items). Only Tier 4's "physics
 feel tuning" stays flagged [~] since the CPU-balance issue is an accepted
 open item, not something left undone.
-Next: Tier 5 extras (dive/block/charged-serve, extra courts, unlockables,
-settings, practice mode, installable/PWA) — or whatever's asked for.
+Tier 5 in progress: charged serve done, block move done.
+
+MAJOR BUG FOUND AND FIXED during a user-requested full audit: the charge-
+and-release hit model (this session's big earlier redesign) was only
+resolving a charged hit/spike/tip if ball contact happened within the
+EXACT SAME TICK as releasing HIT — any realistic timing wasted the whole
+charge. Measured: 6 real charged shots vs 68 total contacts in one match
+before the fix; 80 vs 33 after. Also found and fixed a second bug while
+verifying the first: online guests never animated their own charge meter
+locally (netcode.js's prediction called stepPlayer but not updateCharge).
+Both fixed, verified directly (not just read-through), full test suite
+green. See DECISIONS.md "MAJOR BUG FOUND AND FIXED" section for full
+detail including what's still an accepted open item (CPU win-share, and a
+minor guest-side cosmetic gap on the swing follow-through animation).
+Next: dive move (last un-built Tier 5 core-mechanic item), then extra
+courts/unlockables/settings/practice mode/PWA — or whatever's asked for.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

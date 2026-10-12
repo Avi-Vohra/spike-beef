@@ -64,6 +64,7 @@ const SOUND_EVENTS = {
   hit: () => tone(320, 0.12, { type: 'square', gain: 0.18, slideTo: 220 }),
   spike: () => { tone(200, 0.16, { type: 'sawtooth', gain: 0.25, slideTo: 90 }); noiseBurst(0.08, 0.12); },
   fumble: () => tone(150, 0.1, { type: 'triangle', gain: 0.12, slideTo: 100 }),
+  block: () => { tone(260, 0.1, { type: 'square', gain: 0.2, slideTo: 140 }); noiseBurst(0.05, 0.1); },
   netBounce: () => tone(500, 0.06, { type: 'sine', gain: 0.1 }),
   wallBounce: () => tone(450, 0.05, { type: 'sine', gain: 0.08 }),
   serve: () => tone(440, 0.1, { type: 'sine', gain: 0.15, slideTo: 560 }),

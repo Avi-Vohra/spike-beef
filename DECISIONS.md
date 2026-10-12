@@ -221,3 +221,73 @@ approved plan at the time: charge-and-release hits inspired by Beach Spikers/Win
   it, same pattern as the existing release-lead logic for rally hits.
 - "Soft tip" from this backlog item was already satisfied by the charge-and-release
   redesign's low-charge release — no new work needed there.
+- **Block**: jumping into the ball right at the net (NET_ARC_RANGE, same zone the
+  net-arc-assist uses) without charging now punches it down fast and flat instead of
+  falling through to the same weak 'touch' as any other passive contact — a real 4th
+  shot type. Only applies while airborne; grounded contact at the net stays a plain
+  touch (verified both branches directly, not just by reading the code).
+
+## MAJOR BUG FOUND AND FIXED (user asked for a full audit — this is what it found)
+While checking the new block mechanic's frequency in real play, found it firing far
+more than hit/spike/tip combined (38 blocks vs. 6 real charged shots in one match) —
+investigating why surfaced a serious pre-existing bug in the charge-and-release model
+itself, not something the block mechanic introduced:
+- **The bug**: `justReleased` was a strict single-tick edge flag, unconditionally reset
+  to `false` at the top of every `updateCharge` call unless the release happened on
+  that EXACT tick. Since `resolvePlayerHit` only resolved a charged hit/spike/tip when
+  `p.justReleased` was true, this meant a charged swing only fired if ball contact
+  happened within the same 1/60s tick as the release — releasing even one tick early
+  (which any real human timing, or the AI's intentional release-lead-before-contact
+  logic, does constantly) silently wasted the entire charge and fell through to the
+  weak passive-contact branch. Measured directly: before the fix, one real CPU-vs-CPU
+  match had only 6 real charged shots across ~68 total contacts; the charge mechanic —
+  the entire redesign from earlier this session — was effectively almost never firing.
+  This plausibly explains a meaningful share of the "CPU win-share swings wildly"
+  behavior already documented above, though that stat has other contributing factors
+  too (documented separately) and this wasn't purely a jitter-correlation artifact.
+- **The fix**: added `releaseGraceTimer` (RELEASE_GRACE_SECONDS = 0.15s) — set on
+  release, decremented each tick, consumed (set to 0) the moment a charged swing
+  actually resolves. `resolvePlayerHit` now checks `releaseGraceTimer > 0` instead of
+  the one-tick `justReleased` flag, giving a believable ~150ms window where the release
+  stays "live" and able to connect — long enough for realistic human and AI timing,
+  short enough to still require real timing skill (not "charge and swing whenever").
+  `justReleased` itself is kept (serve logic in sim.js still uses it correctly — serve
+  checks it synchronously in the same tick as release, so no grace window is needed
+  there) but is no longer what gates a charged rally hit.
+- **Verified the fix, not just asserted it**: re-ran the same CPU-vs-CPU match after
+  the fix — spike=40, hit=36, tip=4 (80 real charged shots) vs. touch=27, block=6 (33
+  passive contacts), a complete reversal from before. Updated the one existing test
+  that manually set `p.justReleased = true` to also set `p.releaseGraceTimer` (it was
+  silently relying on the exact internal flag the fix replaced as the gate condition).
+- **Found and fixed a second bug while verifying the first**: `netcode.js`'s guest-side
+  local prediction (`predictedSelf`) called `stepPlayer` every tick but never
+  `updateCharge` — meaning an online guest's OWN charge meter and windup pose would
+  never animate locally, even though the actual hit resolved correctly on the host
+  (which runs the real sim off the raw forwarded input bits). This is exactly the
+  "can't tell when/how to hit" problem from the ORIGINAL redesign complaint, just
+  re-introduced specifically for online guests by an incomplete port of the charge
+  model into the prediction path. Fixed by calling `updateCharge(predictedSelf, ...)`
+  before `stepPlayer` in the guest's tick(). Verified directly over LoopbackTransport:
+  after 10 ticks holding HIT, `guest.getRenderState().self.charging` is now `true` with
+  `charge` actually ramping, where before the fix it would have stayed `false`/`0`
+  forever regardless of input.
+  - **Known remaining minor gap, documented not fixed**: the guest's local avatar still
+    won't show the post-swing follow-through arm animation for its OWN hits (that's set
+    by `resolvePlayerHit`, which only ever runs on the host/authoritative sim, never on
+    the guest's prediction) — the charge/windup telegraph now works, but the swing
+    itself is still only visually confirmed via the next host snapshot, not instantly
+    locally. Gameplay is unaffected (the real ball physics come from the host either
+    way); this is a cosmetic latency gap on the actor's own view of their own swing,
+    judged not worth a deeper guest-side hit-prediction system for this session.
+- Re-measured win-share after the fix: P1 won 172/200 in the 200-match harness (up from
+  15/200 before this session's various tuning attempts) — now that charged hits
+  actually fire, whoever gets the first clean charged shot (often advantaged by serve
+  timing) converts much more decisively. This is a believable mechanism given the fix,
+  not obviously a new bug: traced a real match point-by-point and confirmed BOTH sides
+  land real spikes/hits/net-exchanges in a given rally, it's not one-sided per-rally —
+  the aggregate skew comes from which side tends to land the FIRST good hit more often.
+  Given this session's standing policy of not chasing the CPU self-play win-share stat
+  into the ground (documented earlier: it reflects bot-vs-bot internal dynamics, not
+  necessarily two humans playing), this is logged as a legitimate further-tuning
+  opportunity rather than something blocking this fix, which is unambiguously correct
+  and verified regardless of the resulting balance number.

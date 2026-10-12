@@ -77,6 +77,7 @@ export function run() {
       p.onGround = onGround;
       p.vy = vy;
       p.justReleased = true;
+      p.releaseGraceTimer = 0.15;
       p.releaseCharge = releaseCharge;
       const ball = createBall(p.x, p.y - 36);
       resolvePlayerHit(ball, ball.x, ball.y, p, 0, []);
@@ -131,6 +132,31 @@ export function run() {
     if (strong.vx <= weak.vx) fail(`a longer-held serve should be faster: weak=${weak.vx} strong=${strong.vx}`);
     if (!weak.events.some((e) => e.type === 'serve')) fail('releasing after a short hold should still serve');
     if (!strong.events.some((e) => e.type === 'serve')) fail('releasing after a long hold should still serve');
+  }
+
+  // Test 6d: block — jumping into the ball right at the net without
+  // charging produces a distinct, fast, steep-downward contact (not the
+  // weak default 'touch'), and only when near the net.
+  {
+    function contactOutcome(nearNet, jumpingUp) {
+      const p = createPlayer(0);
+      p.x = nearNet ? 480 - 5 : 480 - 300; // NET_X is WIDTH/2 = 480
+      p.onGround = !jumpingUp;
+      p.vy = jumpingUp ? -100 : 0;
+      const ball = createBall(p.x, p.y - 36);
+      resolvePlayerHit(ball, ball.x, ball.y, p, 0, []); // input=0: not holding HIT
+      return ball;
+    }
+    const blocked = contactOutcome(true, true);
+    const farTouch = contactOutcome(false, true);
+    const groundedNearNet = contactOutcome(true, false);
+    if (Math.hypot(blocked.vx, blocked.vy) <= Math.hypot(farTouch.vx, farTouch.vy)) {
+      fail('a block (jumping, at the net, uncharged) should be stronger than a plain touch far from the net');
+    }
+    if (blocked.vy >= 0) fail('a block should send the ball downward');
+    if (Math.hypot(groundedNearNet.vx, groundedNearNet.vy) >= Math.hypot(blocked.vx, blocked.vy)) {
+      fail('a grounded (non-jumping) contact at the net should NOT get the block bonus');
+    }
   }
 
   // Test 7 (deep audit sim test): 200 seeded CPU vs CPU matches, medium vs medium.

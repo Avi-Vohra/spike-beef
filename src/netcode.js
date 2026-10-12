@@ -6,7 +6,7 @@
 // every few ticks. This module only talks to the transport interface — it
 // never knows if that's PeerTransport or LoopbackTransport.
 import { step } from './sim.js';
-import { stepPlayer, createPlayer, DT, SUBSTEPS } from './physics.js';
+import { stepPlayer, updateCharge, createPlayer, DT, SUBSTEPS } from './physics.js';
 
 export const SNAPSHOT_EVERY_N_TICKS = 2; // 60Hz sim -> ~30Hz snapshots
 export const INPUT_HISTORY = 3;
@@ -138,6 +138,11 @@ export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) 
     transport.send([seq, ...recentInputs]);
 
     localTick += 1;
+    // Predict charge state too, not just position — otherwise the guest's
+    // own avatar never shows its charge meter filling or the windup pose
+    // locally, even though the actual hit resolves correctly on the host
+    // (which runs the real sim off the raw input bits this sends above).
+    updateCharge(predictedSelf, localInput, DT);
     for (let s = 0; s < SUBSTEPS; s++) stepPlayer(predictedSelf, localInput, DT / SUBSTEPS);
   }
 

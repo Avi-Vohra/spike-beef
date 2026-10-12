@@ -47,7 +47,7 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
     armBack = facing * (-14 - 10 * pull);
     armFwd = facing * (6 - 6 * pull);
     armY = shoulderY + 6 + 4 * pull;
-  } else if (p.lastEvent && ['hit', 'spike', 'tip', 'fumble'].includes(p.lastEvent) && p.lastEventTimer > 0) {
+  } else if (p.lastEvent && ['hit', 'spike', 'tip', 'fumble', 'block'].includes(p.lastEvent) && p.lastEventTimer > 0) {
     const progress = 1 - p.lastEventTimer / 0.35;
     const arc = Math.sin(Math.min(1, progress) * Math.PI);
     armBack = facing * (-14 + 36 * progress);

@@ -42,6 +42,7 @@ export function processEvents(events, ball, matchBefore = null) {
       fx.spawnImpact(ball.x, ball.y, 750); vibrate(25); hitStop = Math.max(hitStop, 0.07);
       stats.recordHitEvent(type, ev.side);
     } else if (type === 'fumble') { fx.spawnImpact(ball.x, ball.y, 150); }
+    else if (type === 'block') { fx.spawnImpact(ball.x, ball.y, 550); vibrate(20); hitStop = Math.max(hitStop, 0.05); }
     else if (type === 'netBounce') { fx.spawnImpact(ball.x, ball.y, 200); fx.triggerNetSway(ball.vx > 0 ? 6 : -6); }
     else if (type === 'point') {
       fx.spawnSandPuff(ball.x, ball.y);
