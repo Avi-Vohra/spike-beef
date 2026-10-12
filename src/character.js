@@ -59,6 +59,7 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   let armBack = facing * -14;
   let armFwd = facing * 14;
   let armY = shoulderY + 6;
+  let swingTrailProgress = null; // set below for the hand's motion-blur ghosts
   if (p.diving) {
     // Both arms stretched out in the dive direction, reaching for the ball.
     armBack = p.diveDir * 20;
@@ -75,6 +76,11 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
     armBack = facing * (-14 + 36 * progress);
     armFwd = facing * (14 + 20 * progress);
     armY = shoulderY + 6 - arc * 14;
+    // Only the real power shots get a visible trail — a tip/fumble/save
+    // shouldn't look like it hit as hard as a spike.
+    if (['hit', 'spike', 'block'].includes(p.lastEvent) && progress < 0.65) {
+      swingTrailProgress = progress;
+    }
   } else if (p.lastEvent === 'win') {
     // Little victory pose: both arms up.
     armBack = -16;
@@ -86,6 +92,24 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
     armFwd = 8;
     armY = shoulderY + 16;
   }
+  // Swing trail: a couple of fading "ghost" hand positions a bit earlier in
+  // the swing arc, same idea as the ball's own speed trail in render.js —
+  // gives the hit a sense of motion instead of a single static pose.
+  if (swingTrailProgress !== null) {
+    for (let i = 1; i <= 2; i++) {
+      const pr = Math.max(0, swingTrailProgress - i * 0.13);
+      const arc2 = Math.sin(Math.min(1, pr) * Math.PI);
+      const gx = facing * (14 + 20 * pr);
+      const gy = shoulderY + 6 - arc2 * 14;
+      ctx.globalAlpha = 0.22 / i;
+      ctx.fillStyle = colorDark;
+      ctx.beginPath();
+      ctx.arc(gx, gy, 5, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  }
+
   capsule(ctx, 0, shoulderY + 2, armBack, armY, 7, colorDark);
   capsule(ctx, 0, shoulderY + 2, armFwd, armY, 7, colorDark);
   // Hands at each arm's end — the part that actually does the hitting, so

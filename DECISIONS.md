@@ -620,3 +620,9 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   state for tip/hit/spike/block/save. Fumble stays radial (no single clear "good"
   direction — matches its "weak unaimed deflect" flavor). Verified fx.js still runs
   standalone under Node (no DOM dependency) with no crash on the new angle param.
+- **Swing trail**: added 2 fading "ghost" hand circles trailing the swing arc during the
+  post-hit animation (hit/spike/block only, not tip/fumble/save) — same motion-blur idea
+  already used for the ball's own speed trail, now applied to the hitting hand so a
+  power shot reads as motion, not a single static pose. Reuses the exact same arc formula
+  as the real hand position (sampled a bit earlier in `progress`), so it can't drift out
+  of sync with the actual swing.
