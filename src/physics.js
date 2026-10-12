@@ -116,7 +116,7 @@ export function createPlayer(side) {
   const x = side === 0 ? WIDTH * 0.25 : WIDTH * 0.75;
   return {
     side, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
-    charging: false, charge: 0, aimDir: 0, justReleased: false, releaseCharge: 0,
+    charging: false, charge: 0, justReleased: false, releaseCharge: 0,
     releaseGraceTimer: 0,
     diving: false, diveTimer: 0, diveCooldownTimer: 0, diveDir: 0,
     prevLeftHeld: false, prevRightHeld: false, leftReleaseAge: null, rightReleaseAge: null,
@@ -130,8 +130,10 @@ function playerBounds(side) {
 }
 
 // Charge/release state machine — runs once per full tick (not per sub-step):
-// holding HIT ramps charge and steers aimDir from LEFT/RIGHT; releasing HIT
-// (detected via the `charging` flag itself going true->false) opens a short
+// holding HIT ramps charge (movement stays free throughout — see
+// resolvePlayerHit's `placement` bias for how the movement keys still matter
+// at the moment of contact); releasing HIT (detected via the `charging` flag
+// itself going true->false) opens a short
 // RELEASE_GRACE_SECONDS window (releaseGraceTimer) during which ball contact
 // still resolves as the charged swing — see resolvePlayerHit below. Without
 // this window the swing only connects if contact happens in the exact same
@@ -226,25 +228,34 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
 
   if (p.releaseGraceTimer > 0) {
     const charge = p.releaseCharge;
-    const aimX = p.aimDir !== 0 ? p.aimDir : dirX;
+    const aimX = dirX;
+    // Shot placement: whichever movement key is held AT CONTACT (the same
+    // bits already used for free movement all game — no new input, no
+    // movement cost during the charge itself) leans the shot. Toward-net =
+    // flatter/harder (closer, riskier kill); away-from-net = more arc
+    // (safer, lands deeper). Real tactical choice using the 1D court axis
+    // this sim actually has, rather than the earlier cut lateral-aim idea
+    // which didn't map onto a side-view court at all.
+    const towardBit = dirX > 0 ? RIGHT : LEFT;
+    const awayBit = dirX > 0 ? LEFT : RIGHT;
+    const placement = (input & towardBit) ? 1 : (input & awayBit) ? -1 : 0;
     if (charge >= SPIKE_MIN_CHARGE && jumping && nearPeak) {
       power = lerp(SPIKE_MIN_POWER, SPIKE_MAX_POWER, charge);
       steep = 0.5;
       eventType = 'spike';
     } else if (charge < TIP_CHARGE_THRESHOLD) {
       power = TIP_POWER;
-      steep = 2.2;
+      steep = 2.2 * (1 - placement * 0.18);
       eventType = 'tip';
     } else {
-      power = lerp(MIN_CHARGE_POWER, MAX_CHARGE_POWER, charge);
-      steep = lerp(2.0, 1.2, charge);
+      power = lerp(MIN_CHARGE_POWER, MAX_CHARGE_POWER, charge) * (1 + placement * 0.08);
+      steep = lerp(2.0, 1.2, charge) * (1 - placement * 0.18);
       eventType = 'hit';
     }
     ball.vx = aimX * power;
     ball.vy = -power * steep * 0.6;
     p.justReleased = false;
     p.releaseGraceTimer = 0;
-    p.aimDir = 0;
     ensureClearsNet(ball);
   } else if (p.charging) {
     // Mistimed — the ball arrived mid-charge. Costs you the charge, and

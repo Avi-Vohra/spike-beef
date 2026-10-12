@@ -523,3 +523,20 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   code — both now clearly read as rounded/lit rather than flat discs. Limbs/torso left
   as flat-colored capsules (stroked lines, not easily gradient-shaded without a larger
   rewrite) — judged lower value than the two most-looked-at round shapes on screen.
+- **Shot placement, done right this time**: found `p.aimDir` was dead code — a vestige
+  of the mid-session redesign's cut "steer aim while charging" idea (reverted because it
+  conflicted with free movement during charge) that was never removed, always 0, meaning
+  every charged hit went in exactly one fixed horizontal direction (straight toward the
+  opponent) with power/arc as the only real variable. Re-examined why the original idea
+  was cut: it tried to add a LATERAL aim axis, which doesn't actually exist in this
+  strictly 2D side-view sim — x is the court's only spatial axis, already fully used for
+  player position and shot depth via charge/power. Implemented the version that actually
+  fits this game's geometry instead: whichever movement key is held AT THE INSTANT OF
+  CONTACT (same bits used for free movement all game, read a second time for a second
+  purpose — no new input, no movement cost during the charge itself) leans a hit/tip
+  flatter+harder (toward-net direction: a riskier, more aggressive kill-style shot) or
+  more arced (away-from-net: safer, lands deeper). Verified numerically, not just by
+  reading the code: same charge level, RIGHT-held-at-contact vs neutral vs LEFT-held
+  produced vx 557/516/475 and vy -417/-471/-511 — a real, usable tactical choice.
+  Removed the dead `aimDir` field entirely rather than leaving it alongside the new
+  mechanic. Full test suite still green.
