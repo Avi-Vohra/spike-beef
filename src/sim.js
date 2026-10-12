@@ -116,6 +116,19 @@ export function step(state, inputP1, inputP2) {
     return { state: next, events };
   }
 
+  // Only one player can actually touch the ball first in a given tick.
+  // Without this guard, two players both pressed up against the net (their
+  // collision radii geometrically overlap there: PLAYER_RADIUS=26 vs a
+  // minimum gap of only 62px at the net boundary) could BOTH register a hit
+  // on the same ball within the same 1/60s tick — not even in the same
+  // substep necessarily, since each player's own HIT_COOLDOWN only blocks
+  // THAT player from re-hitting, not the other side from hitting in a later
+  // substep of the same tick. Confirmed directly: without this, the second
+  // contact immediately reversed what the first just did (vx flipped sign)
+  // and fired two 'touch' events for one physical contact. Real scenario in
+  // human-vs-human play (two players both rushing the net for a 50-50
+  // ball), not just a contrived test.
+  let ballTouchedThisTick = false;
   const subDt = DT / SUBSTEPS;
   for (let s = 0; s < SUBSTEPS; s++) {
     const prevX = next.ball.x;
@@ -123,16 +136,20 @@ export function step(state, inputP1, inputP2) {
     stepBallGravity(next.ball, subDt);
     next.rngSeed = resolveBallBounds(next.ball, events, next.rngSeed, stepRandom);
 
-    for (const p of next.players) {
-      const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.side], events);
-      if (hit) {
-        const fault = registerTouch(next.match, p.side);
-        if (fault) {
-          const groundSide = p.side;
-          awardPoint(next.match, groundSide, events);
-          setPointReaction(next.players, groundSide);
-          next.pauseTimer = next.match.phase === 'setWon' ? SET_PAUSE_SECONDS : POINT_PAUSE_SECONDS;
-          return { state: next, events };
+    if (!ballTouchedThisTick) {
+      for (const p of next.players) {
+        const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.side], events);
+        if (hit) {
+          ballTouchedThisTick = true;
+          const fault = registerTouch(next.match, p.side);
+          if (fault) {
+            const groundSide = p.side;
+            awardPoint(next.match, groundSide, events);
+            setPointReaction(next.players, groundSide);
+            next.pauseTimer = next.match.phase === 'setWon' ? SET_PAUSE_SECONDS : POINT_PAUSE_SECONDS;
+            return { state: next, events };
+          }
+          break;
         }
       }
     }

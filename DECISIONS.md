@@ -667,3 +667,33 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   banner) — render.js had grown to 303 lines across this round's additions, back to 213
   after the split; hud.js is 98 lines. Verified both still compile and the match renders
   correctly after the move, not just a syntax check.
+
+## SIXTH audit finding: double-hit-same-tick bug near the net
+Continuing the edge-case hunt with the user now focused on real 2-player (local + online)
+testing. Checked whether two players could physically both reach the ball at once —
+PLAYER_RADIUS=26, and the minimum gap between two players both pressed up against the
+net boundary is only 62px, so the ball sitting at center court (equidistant, 31px from
+each) is within collision range (minDist=38) of BOTH players simultaneously.
+- **Confirmed via direct reproduction, not assumed**: with both players at that exact
+  boundary position and the ball between them, calling `step()` once produced TWO
+  separate 'touch' events in the same tick (side 1 then side 0), with the second
+  immediately reversing the velocity the first had just set (vx flipped from the
+  direction p1 sent it to the opposite direction from p2) — a physically nonsensical
+  same-instant double-contact, and two fault-eligible touches charged in one tick.
+- **Root cause**: `sim.js`'s hit-resolution loop ran once per substep (4 substeps/tick),
+  and each player's own `hitCooldown` only blocks THAT player from re-hitting — it does
+  nothing to stop the OTHER side from also registering a hit in a later substep of the
+  SAME tick. My first fix attempt (a `break` after the first hit within one substep's
+  inner loop) only stopped it within a single substep and did NOT fix the real bug,
+  which spans substeps — caught by re-running the exact reproduction after the first
+  fix and seeing it still fail, not by assuming the first attempt worked.
+- **The real fix**: a tick-level `ballTouchedThisTick` flag (not substep-level), set the
+  moment any player registers a hit, gating the entire hit-resolution loop for the
+  remaining substeps of that tick. Re-ran the reproduction: exactly one 'touch' event
+  now, correct final velocity.
+- **Verified this doesn't change normal play**: re-measured the 40-match CPU-vs-CPU
+  average rally length before/after — 4.84 both times, identical. This is a real, rare
+  edge case (both players deliberately crowding the exact net boundary), not something
+  that was quietly affecting typical rallies, but a genuine correctness bug for the kind
+  of tight net-crowding play two competitive humans (the current focus) are likely to
+  produce more often than the CPU, which doesn't deliberately camp the net boundary.
