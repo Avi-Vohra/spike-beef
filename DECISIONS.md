@@ -576,3 +576,19 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   (cmd+shift+r) was needed to see the real current state. Worth remembering for any
   future live-browser check in this environment: a `navigate` alone isn't sufficient
   proof of "what's actually running," a hard reload is.
+- **Tried and reverted: deliberate AI shot placement**. Attempted to make medium/hard AI
+  use the new placement mechanic intentionally — aim toward the net (short/flat) when
+  the opponent is standing deep, away from it (deep/arc) when they're camped at net,
+  i.e. "hit where they ain't." Code was correct and the test suite's PASS/fail gates all
+  stayed green (no out-of-bounds, no NaN, no stuck matches, dive-rate guard fine) — but
+  measured the actual effect directly rather than trusting that: average rally length
+  across 50 CPU-vs-CPU matches dropped from 5.05 hits (current baseline) to 2.24 — more
+  than HALVED. That's a real, large regression against the single goal the entire
+  mechanics redesign existed for ("points finish so fast, no time to respond" was the
+  ORIGINAL user complaint this whole session started from) — a smarter-looking AI isn't
+  worth cutting rally length in half. Reverted via `git checkout -- src/ai.js`. Lesson:
+  this is exactly the kind of change that looks correct by code review and still needs
+  a real before/after measurement, same discipline as every other finding this session —
+  the stress-test harness's win-share metric is known-noisy, but rally length is one of
+  its stable, trustworthy signals and should be checked before keeping any AI behavior
+  change, not just the hard pass/fail gates.
