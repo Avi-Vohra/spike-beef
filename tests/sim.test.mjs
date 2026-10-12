@@ -1,5 +1,7 @@
 import { createInitialState, step } from '../src/sim.js';
-import { HIT, JUMP, RIGHT, createPlayer, createBall, resolvePlayerHit, updateCharge } from '../src/physics.js';
+import { HIT, JUMP, RIGHT, createPlayer, resolvePlayerHit, updateCharge } from '../src/physics.js';
+import { createBall } from '../src/ball.js';
+import { updateDive } from '../src/dive.js';
 import { isMatchWon, createMatchState, registerTouch } from '../src/rules.js';
 import { aiInput, DIFFICULTIES } from '../src/ai.js';
 import { fail } from './helpers.mjs';
@@ -157,6 +159,48 @@ export function run() {
     if (Math.hypot(groundedNearNet.vx, groundedNearNet.vy) >= Math.hypot(blocked.vx, blocked.vy)) {
       fail('a grounded (non-jumping) contact at the net should NOT get the block bonus');
     }
+  }
+
+  // Test 6e: dive — double-tapping a direction while grounded triggers a
+  // fast lunge (not a single tap, not while charging), it expires on its
+  // own after DIVE_DURATION, and a cooldown blocks immediately re-diving.
+  // Ball contact while diving resolves as a weak defensive 'save', not a
+  // full attack.
+  {
+    const p = createPlayer(0);
+    const dt = 1 / 60;
+    let started = updateDive(p, RIGHT, dt); // single tap: no dive yet
+    if (started || p.diving) fail('a single tap should not trigger a dive');
+    updateDive(p, 0, dt); // release
+    started = updateDive(p, RIGHT, dt); // second tap within the window: dive
+    if (!started || !p.diving) fail('a double-tap within the window should trigger a dive');
+    if (p.diveDir !== 1) fail(`dive direction should match the tapped direction: got ${p.diveDir}`);
+
+    let ticksToExpire = 0;
+    while (p.diving && ticksToExpire < 60) { updateDive(p, 0, dt); ticksToExpire++; }
+    if (p.diving) fail('dive should expire on its own after DIVE_DURATION');
+
+    // Immediately double-tap again — should be blocked by the cooldown.
+    updateDive(p, RIGHT, dt);
+    updateDive(p, 0, dt);
+    const retrigger = updateDive(p, RIGHT, dt);
+    if (retrigger || p.diving) fail('diving again immediately after the first dive should be blocked by the cooldown');
+
+    // A double-tap while charging should be ignored (charge takes priority).
+    const p2 = createPlayer(0);
+    updateCharge(p2, HIT, dt);
+    updateDive(p2, RIGHT, dt);
+    updateDive(p2, 0, dt);
+    const divedWhileCharging = updateDive(p2, RIGHT, dt);
+    if (divedWhileCharging || p2.diving) fail('double-tapping while charging should not trigger a dive');
+
+    // Contact while diving is a 'save', not a full attack.
+    const p3 = createPlayer(0);
+    p3.diving = true;
+    p3.diveDir = 1;
+    const ball = createBall(p3.x, p3.y - 36);
+    resolvePlayerHit(ball, ball.x, ball.y, p3, 0, []);
+    if (p3.lastEvent !== 'save') fail(`contact while diving should produce a 'save' event, got '${p3.lastEvent}'`);
   }
 
   // Test 7 (deep audit sim test): 200 seeded CPU vs CPU matches, medium vs medium.

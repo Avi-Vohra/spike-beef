@@ -52,7 +52,8 @@ TIER 4 FULLY COMPLETE too (net sway, animated sea wave, CSS screen
 transitions closed out the last 3 partial items). Only Tier 4's "physics
 feel tuning" stays flagged [~] since the CPU-balance issue is an accepted
 open item, not something left undone.
-Tier 5 in progress: charged serve done, block move done.
+Tier 5 core-mechanics item COMPLETE: charged serve, block, dive, soft tip
+(already satisfied by the charge model) all done and tested.
 
 MAJOR BUG FOUND AND FIXED during a user-requested full audit: the charge-
 and-release hit model (this session's big earlier redesign) was only
@@ -66,8 +67,16 @@ Both fixed, verified directly (not just read-through), full test suite
 green. See DECISIONS.md "MAJOR BUG FOUND AND FIXED" section for full
 detail including what's still an accepted open item (CPU win-share, and a
 minor guest-side cosmetic gap on the swing follow-through animation).
-Next: dive move (last un-built Tier 5 core-mechanic item), then extra
-courts/unlockables/settings/practice mode/PWA — or whatever's asked for.
+THIRD major audit finding (same audit pass, found while wiring dive's fx):
+online GUESTS never got any sound/particles/vibration/announcer feedback
+for the whole session — guestController.tick() discarded its return value,
+so main.js's processEvents call never fired for guests. Fixed via a new
+drainEvents() on the guest netcode. Verified directly over
+LoopbackTransport. Full detail in DECISIONS.md.
+Also split src/ball.js out of physics.js (which had grown to 331 lines)
+to stay under the file-size guideline — all tests green after the move.
+Next: extra courts, unlockable cosmetics, settings screen, practice mode,
+PWA installability — or whatever's asked for.
 
 # Log
 - Done: sim.js + physics.js + rules.js with tests (headless match completes, deterministic, in-bounds).

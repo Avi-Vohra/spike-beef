@@ -12,7 +12,7 @@ const EMOTE_GLYPH = { laugh: '\u{1F602}', cry: '\u{1F62D}', sleep: '\u{1F4A4}', 
 export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   const facing = facingBall >= 0 ? 1 : -1;
   const airborne = !(p.onGround ?? true);
-  const squash = airborne ? Math.max(0.82, 1 - Math.abs(p.vy) / 4200) : 1;
+  const squash = p.diving ? 0.55 : airborne ? Math.max(0.82, 1 - Math.abs(p.vy) / 4200) : 1;
 
   // Ground shadow — drawn in world space, unaffected by the squash scale.
   ctx.fillStyle = PALETTE.shadow;
@@ -22,6 +22,9 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
 
   ctx.save();
   ctx.translate(p.x, p.y);
+  // A dive leans the whole figure into the lunge direction — a cheap but
+  // readable "stretched-out horizontal reach" silhouette.
+  if (p.diving) ctx.rotate(p.diveDir * 0.4);
   ctx.scale(2 - squash, squash);
 
   const runAmp = Math.min(1, Math.abs(p.vx) / 300);
@@ -42,12 +45,17 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   let armBack = facing * -14;
   let armFwd = facing * 14;
   let armY = shoulderY + 6;
-  if (p.charging) {
+  if (p.diving) {
+    // Both arms stretched out in the dive direction, reaching for the ball.
+    armBack = p.diveDir * 20;
+    armFwd = p.diveDir * 20;
+    armY = shoulderY - 4;
+  } else if (p.charging) {
     const pull = p.charge;
     armBack = facing * (-14 - 10 * pull);
     armFwd = facing * (6 - 6 * pull);
     armY = shoulderY + 6 + 4 * pull;
-  } else if (p.lastEvent && ['hit', 'spike', 'tip', 'fumble', 'block'].includes(p.lastEvent) && p.lastEventTimer > 0) {
+  } else if (p.lastEvent && ['hit', 'spike', 'tip', 'fumble', 'block', 'save'].includes(p.lastEvent) && p.lastEventTimer > 0) {
     const progress = 1 - p.lastEventTimer / 0.35;
     const arc = Math.sin(Math.min(1, progress) * Math.PI);
     armBack = facing * (-14 + 36 * progress);

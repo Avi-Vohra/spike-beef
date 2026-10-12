@@ -51,7 +51,7 @@ function guestController(transport, callbacks) {
   let net = createGuestNetcode(transport, callbacks);
   return {
     isHost: false,
-    tick(localInput) { net.tick(swapLeftRight(localInput)); },
+    tick(localInput) { net.tick(swapLeftRight(localInput)); return { events: net.drainEvents() }; },
     getDisplayState() {
       const r = net.getRenderState();
       if (!r.ball || !r.match) return null;

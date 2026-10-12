@@ -1,7 +1,7 @@
 import {
   WIDTH, HEIGHT, GROUND_Y, NET_X, NET_TOP, NET_HALF_W, BALL_RADIUS,
-  predictLandingPoint,
 } from './physics.js';
+import { predictLandingPoint } from './ball.js';
 import { PALETTE, outlinedCircle } from './art.js';
 import { drawPlayer, drawEmoteBubble } from './character.js';
 

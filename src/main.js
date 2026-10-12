@@ -270,7 +270,7 @@ function frame(now) {
         spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
         if (result && matchBefore) {
           matchBefore.setsAfter = state.match.sets;
-          processEvents(result.events, state.ball, matchBefore);
+          processEvents(result.events, state.ball, matchBefore, state.players);
         }
         if (state.match.phase === 'matchWon') { enterReplay(); break; }
       }
@@ -293,7 +293,7 @@ function frame(now) {
       spin += (Math.abs(state.ball.vx) + Math.abs(state.ball.vy)) * 0.0006;
       acc -= DT;
       matchBefore.setsAfter = state.match.sets;
-      hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball, matchBefore));
+      hitStopTimer = Math.max(hitStopTimer, processEvents(result.events, state.ball, matchBefore, state.players));
       if (state.match.phase === 'matchWon') { enterReplay(); break; }
     }
   } else if (appScreen === 'replay') {

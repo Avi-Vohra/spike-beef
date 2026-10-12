@@ -47,6 +47,14 @@ export const NET_ARC_BOOST = 1.1; // max extra steep when hitting right on the n
 export const BLOCK_POWER = 480; // jumping into the ball at the net, uncharged
 export const BLOCK_STEEP = 0.45; // fast and flat — punched straight down
 
+// Dive: double-tap LEFT or RIGHT while grounded for a fast defensive lunge,
+// reaching balls otherwise out of range. No new input bit — reuses the
+// existing movement keys, so no network/touch-UI changes needed. See dive.js.
+export const DIVE_SPEED = 820;
+export const DIVE_DURATION = 0.22;
+export const DIVE_COOLDOWN = 0.6;
+export const DOUBLE_TAP_WINDOW = 0.25;
+
 function lerp(a, b, t) { return a + (b - a) * t; }
 
 export function createPlayer(side) {
@@ -55,12 +63,10 @@ export function createPlayer(side) {
     side, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
     charging: false, charge: 0, aimDir: 0, justReleased: false, releaseCharge: 0,
     releaseGraceTimer: 0,
+    diving: false, diveTimer: 0, diveCooldownTimer: 0, diveDir: 0,
+    prevLeftHeld: false, prevRightHeld: false, leftTapWindow: 0, rightTapWindow: 0,
     lastEvent: null, lastEventTimer: 0, runPhase: 0,
   };
-}
-
-export function createBall(x, y) {
-  return { x, y, vx: 0, vy: 0 };
 }
 
 function playerBounds(side) {
@@ -103,15 +109,19 @@ export function stepPlayer(p, input, dt) {
   // purely a timing/commitment skill now: hold longer for more power,
   // released at the right moment, with no positioning cost.
   let vx = 0;
-  if (input & LEFT) vx -= MOVE_SPEED;
-  if (input & RIGHT) vx += MOVE_SPEED;
+  if (p.diving) {
+    vx = p.diveDir * DIVE_SPEED;
+  } else {
+    if (input & LEFT) vx -= MOVE_SPEED;
+    if (input & RIGHT) vx += MOVE_SPEED;
+  }
   p.vx = vx;
   p.x += p.vx * dt;
   if (p.x < lo) p.x = lo;
   if (p.x > hi) p.x = hi;
   p.runPhase += Math.abs(p.vx) * dt * 0.02;
 
-  if (p.onGround && (input & JUMP)) {
+  if (p.onGround && !p.diving && (input & JUMP)) {
     p.vy = JUMP_VY;
     p.onGround = false;
   }
@@ -127,91 +137,6 @@ export function stepPlayer(p, input, dt) {
   }
 
   if (p.hitCooldown > 0) p.hitCooldown -= dt;
-}
-
-export function stepBallGravity(ball, dt) {
-  ball.vy += GRAVITY * dt;
-  ball.x += ball.vx * dt;
-  ball.y += ball.vy * dt;
-}
-
-// Where the ball will hit the ground, given current position/velocity under
-// gravity. Shared by the AI's targeting and the landing-marker render hint —
-// one function, two consumers, so they never disagree.
-export function predictLandingPoint(ball) {
-  const a = 0.5 * GRAVITY;
-  const b = ball.vy;
-  const c = ball.y - GROUND_Y;
-  const disc = b * b - 4 * a * c;
-  if (disc < 0) return { x: ball.x, t: 0 };
-  const t = (-b + Math.sqrt(disc)) / (2 * a);
-  if (!(t > 0) || !Number.isFinite(t)) return { x: ball.x, t: 0 };
-  return { x: ball.x + ball.vx * t, t };
-}
-
-// Walls, ceiling, net. `nextRandomFn`/`rngSeed`, if provided, apply a small
-// seeded jitter to net/wall bounces only — a little physical "luck" that
-// never touches direct player hits, so skill stays precise but the odd
-// bounce can go either way. Returns the (possibly advanced) rng seed.
-export function resolveBallBounds(ball, events, rngSeed, nextRandomFn) {
-  let seed = rngSeed;
-  const jitter = () => {
-    if (!nextRandomFn) return 1;
-    const [v, next] = nextRandomFn(seed);
-    seed = next;
-    return 0.94 + v * 0.12; // +/-6%
-  };
-
-  if (ball.x - BALL_RADIUS < 0) {
-    ball.x = BALL_RADIUS;
-    ball.vx = Math.abs(ball.vx) * BALL_RESTITUTION * jitter();
-    events.push('wallBounce');
-  }
-  if (ball.x + BALL_RADIUS > WIDTH) {
-    ball.x = WIDTH - BALL_RADIUS;
-    ball.vx = -Math.abs(ball.vx) * BALL_RESTITUTION * jitter();
-    events.push('wallBounce');
-  }
-  if (ball.y - BALL_RADIUS < 0) {
-    ball.y = BALL_RADIUS;
-    ball.vy = Math.abs(ball.vy) * BALL_RESTITUTION;
-    events.push('wallBounce');
-  }
-
-  // Net: a thin vertical post from NET_TOP to GROUND_Y at NET_X.
-  const withinNetHeight = ball.y + BALL_RADIUS > NET_TOP;
-  const nearNetX = Math.abs(ball.x - NET_X) < NET_HALF_W + BALL_RADIUS;
-  if (withinNetHeight && nearNetX) {
-    if (ball.x < NET_X) {
-      ball.x = NET_X - NET_HALF_W - BALL_RADIUS;
-      ball.vx = (-Math.abs(ball.vx) * BALL_RESTITUTION - 20) * jitter();
-    } else {
-      ball.x = NET_X + NET_HALF_W + BALL_RADIUS;
-      ball.vx = (Math.abs(ball.vx) * BALL_RESTITUTION + 20) * jitter();
-    }
-    events.push('netBounce');
-  }
-
-  // Net top: ball landing on top of the net from above.
-  if (nearNetX && ball.y + BALL_RADIUS >= NET_TOP && ball.y - BALL_RADIUS < NET_TOP && ball.vy > 0) {
-    ball.y = NET_TOP - BALL_RADIUS;
-    ball.vy = (-Math.abs(ball.vy) * BALL_RESTITUTION - 40) * jitter();
-    events.push('netBounce');
-  }
-
-  return seed;
-}
-
-// Ball vs ground. Returns true if the ball touched the ground this step
-// (caller uses this to award the point to the other side).
-export function resolveGround(ball) {
-  if (ball.y + BALL_RADIUS >= GROUND_Y) {
-    ball.y = GROUND_Y - BALL_RADIUS;
-    ball.vy = -Math.abs(ball.vy) * BALL_RESTITUTION;
-    if (Math.abs(ball.vy) < 40) ball.vy = 0;
-    return true;
-  }
-  return false;
 }
 
 // Swept circle-circle collision between ball and player over this substep.
@@ -288,8 +213,19 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     power = BLOCK_POWER;
     ball.vx = dirX * power;
     ball.vy = -power * BLOCK_STEEP * 0.6;
+  } else if (p.diving) {
+    // Save: reached the ball via a dive — gets it back over, but only a
+    // weak defensive poke, not an attack (matches the real-volleyball feel
+    // of a dive being about staying in the rally, not scoring off it).
+    eventType = 'save';
+    const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
+    const aimX = inputDirX !== 0 ? inputDirX : dirX;
+    power = DEFAULT_POWER;
+    ball.vx = aimX * power;
+    ball.vy = -power * DEFAULT_STEEP * 0.6;
   } else {
-    // Passive contact — never charging, not blocking. A gentle, unaimed touch.
+    // Passive contact — never charging, not blocking, not diving. A gentle,
+    // unaimed touch.
     eventType = 'touch';
     const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
     const aimX = inputDirX !== 0 ? inputDirX : dirX;

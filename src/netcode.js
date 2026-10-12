@@ -7,6 +7,7 @@
 // never knows if that's PeerTransport or LoopbackTransport.
 import { step } from './sim.js';
 import { stepPlayer, updateCharge, createPlayer, DT, SUBSTEPS } from './physics.js';
+import { updateDive } from './dive.js';
 
 export const SNAPSHOT_EVERY_N_TICKS = 2; // 60Hz sim -> ~30Hz snapshots
 export const INPUT_HISTORY = 3;
@@ -92,8 +93,19 @@ export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) 
   let localTick = 0;
   let predictedSelf = createPlayer(1);
   let lastMessageTime = Date.now();
+  let drainedUpTo = 0; // index into eventLog already handed to the caller
 
   function sendTaunt(kind, value) { transport.send({ t: 'emote', kind, value }); }
+
+  // Returns events appended since the last call (so the caller — main.js —
+  // can drive sound/fx/vibration for the guest too; before this existed the
+  // guest side of an online match got none of that feedback at all, since
+  // nothing ever read getEvents()'s full cumulative log).
+  function drainEvents() {
+    const fresh = eventLog.slice(drainedUpTo);
+    drainedUpTo = eventLog.length;
+    return fresh;
+  }
   function sendRematchReady() { transport.send({ t: 'rematchReady' }); }
   function getSilentMs(now = Date.now()) { return now - lastMessageTime; }
 
@@ -143,6 +155,7 @@ export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) 
     // locally, even though the actual hit resolves correctly on the host
     // (which runs the real sim off the raw input bits this sends above).
     updateCharge(predictedSelf, localInput, DT);
+    updateDive(predictedSelf, localInput, DT);
     for (let s = 0; s < SUBSTEPS; s++) stepPlayer(predictedSelf, localInput, DT / SUBSTEPS);
   }
 
@@ -178,6 +191,6 @@ export function createGuestNetcode(transport, { onTaunt, onRematchReady } = {}) 
 
   return {
     tick, getSnapshot: () => lastSnapshot, getEvents: () => eventLog, getRenderState,
-    sendTaunt, sendRematchReady, getSilentMs,
+    sendTaunt, sendRematchReady, getSilentMs, drainEvents,
   };
 }

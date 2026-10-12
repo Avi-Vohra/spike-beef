@@ -291,3 +291,52 @@ itself, not something the block mechanic introduced:
   necessarily two humans playing), this is logged as a legitimate further-tuning
   opportunity rather than something blocking this fix, which is unambiguously correct
   and verified regardless of the resulting balance number.
+
+## Dive move + a THIRD audit finding (same user-requested audit pass)
+- **Dive**: double-tap LEFT or RIGHT while grounded (and not charging) triggers a fast
+  (DIVE_SPEED=820 vs MOVE_SPEED=430) lunge for DIVE_DURATION=0.22s, with a
+  DIVE_COOLDOWN=0.6s before it can trigger again. Deliberately uses the EXISTING
+  movement bits (no new input bit) via a double-tap detector (src/dive.js) — this means
+  zero changes to the network protocol, touch-UI layout, or keybindings for a whole new
+  move. Ball contact while diving resolves as a weak 'save' (keeps the rally alive,
+  doesn't attack) rather than falling through to a hit/block, matching how a real
+  volleyball dive works. Verified directly: double-tap triggers, single-tap doesn't,
+  charging suppresses it, it expires on its own, the cooldown blocks an immediate
+  re-trigger, and contact while diving produces 'save' not 'hit'/'block' — all unit
+  tested (tests/sim.test.mjs Test 6e), not just read-through.
+- CPU players never dive (no AI change for this) — they already reposition toward the
+  ball with perfect information, so diving (a human-skill/commitment mechanic) doesn't
+  add anything for them. Documented, not an oversight.
+- **Third audit finding, found while wiring dive's sound/fx**: the online GUEST in a
+  multiplayer match never got ANY sound, particles, vibration, or announcer feedback,
+  for the entire session until now. Root cause: `guestController.tick()` (online.js)
+  called `net.tick(...)` and discarded the return value, so `main.js`'s
+  `if (result && matchBefore) processEvents(...)` branch was always skipped for guests
+  (result was `undefined`), and nothing anywhere ever called the guest netcode's
+  existing-but-unused `getEvents()`. This is the exact "can't tell what's happening"
+  class of bug the mechanics redesign was supposed to fix, silently reintroduced for
+  one specific player role. Fixed: added `drainEvents()` to the guest netcode (returns
+  only newly-arrived events since the last call, via an index cursor into the existing
+  eventLog), and `guestController.tick()` now returns `{ events: net.drainEvents() }`
+  so main.js's existing processEvents call fires for guests too.
+  - Caveat handled carefully: the host's snapshot only ever serialized bare event TYPE
+    strings (no `side`/`winner`/`charge` — those fields were dropped when
+    `pendingEventTypes.push(typeof ev === 'string' ? ev : ev.type)` ran), so a guest's
+    drained events lack those fields. Rather than leave stats/announcer code silently
+    computing on `undefined` sides (which would produce a wrong-but-plausible-looking
+    banner/streak count — worse than showing nothing), added an explicit
+    `typeof ev.winner === 'number'` guard in gameEvents.js before touching
+    stats/announcer for a 'point' event. Net effect: guests now get full sound/particle/
+    vibration feedback (the "feels dead" bug, fixed), while stats/announcer-banner
+    fidelity for a guest's own screen remains an accepted, explicitly-guarded gap
+    (consistent with the similar documented gap for guest animation follow-through
+    above) rather than something papered over with fabricated data.
+  - Verified directly over LoopbackTransport: held HIT then released to trigger a real
+    serve on the host, confirmed the guest's `drainEvents()` actually returns
+    `{tick, type:'serve'}` etc. — not just that the code compiles.
+- Split `src/ball.js` out of `src/physics.js` (createBall/stepBallGravity/
+  predictLandingPoint/resolveBallBounds/resolveGround — all ball-only, no player-state
+  dependency) since physics.js had grown to 331 lines across this audit's fixes;
+  physics.js is back to 242. Updated every importer (ai.js, render.js, sim.js,
+  tests/sim.test.mjs) to pull these from the new module. All tests green after the move,
+  not just syntax-checked.

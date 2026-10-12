@@ -1,8 +1,9 @@
 import {
   WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS,
-  createPlayer, createBall, stepPlayer, stepBallGravity, updateCharge,
-  resolveBallBounds, resolveGround, resolvePlayerHit,
+  createPlayer, stepPlayer, updateCharge, resolvePlayerHit,
 } from './physics.js';
+import { createBall, stepBallGravity, resolveBallBounds, resolveGround } from './ball.js';
+import { updateDive } from './dive.js';
 import {
   createMatchState, registerTouch, awardPoint, startServe, AUTO_SERVE_SECONDS,
 } from './rules.js';
@@ -80,7 +81,10 @@ export function step(state, inputP1, inputP2) {
     return { state: next, events };
   }
 
-  for (const p of next.players) updateCharge(p, inputs[p.side], DT);
+  for (const p of next.players) {
+    updateCharge(p, inputs[p.side], DT);
+    if (updateDive(p, inputs[p.side], DT)) events.push({ type: 'dive', side: p.side });
+  }
   for (let s = 0; s < SUBSTEPS; s++) {
     for (const p of next.players) stepPlayer(p, inputs[p.side], DT / SUBSTEPS);
   }

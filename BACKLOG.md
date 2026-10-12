@@ -37,7 +37,7 @@ with whatever time remains.
 [~] Physics feel tuning from sim stats — iterated extensively via the 200-match harness; CPU-vs-CPU win-share balance remains an open, documented issue (see DECISIONS.md)
 
 ## Tier 5, extras
-[ ] Dive move, block, soft tip, charged serve (with tests, synced online)
+[x] Dive move, block, soft tip, charged serve (with tests, synced online)
 [ ] Extra courts: night beach, gym, rooftop
 [ ] Unlockable hats and ball skins from wins
 [ ] Settings: points per set, sets, saved locally

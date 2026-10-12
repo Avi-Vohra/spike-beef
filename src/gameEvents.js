@@ -6,6 +6,7 @@ import { vibrate } from './device.js';
 import { playEvent } from './audio.js';
 import * as announcer from './announcer.js';
 import * as stats from './stats.js';
+import { GROUND_Y } from './physics.js';
 
 export const bannerState = { text: null, timer: 0 };
 export function updateBanner(dt) {
@@ -30,7 +31,7 @@ export function resetAnnouncer() {
 // i.e. offline or the online host, not a guest working from a snapshot) lets
 // this also drive the announcer banner (ACE/streaks/comeback/etc), since
 // those need the score/server/rallyHits as they were *before* this batch.
-export function processEvents(events, ball, matchBefore = null) {
+export function processEvents(events, ball, matchBefore = null, players = null) {
   let hitStop = 0;
   const hadNetBounce = events.some((ev) => (typeof ev === 'string' ? ev : ev.type) === 'netBounce');
   for (const ev of events) {
@@ -43,11 +44,23 @@ export function processEvents(events, ball, matchBefore = null) {
       stats.recordHitEvent(type, ev.side);
     } else if (type === 'fumble') { fx.spawnImpact(ball.x, ball.y, 150); }
     else if (type === 'block') { fx.spawnImpact(ball.x, ball.y, 550); vibrate(20); hitStop = Math.max(hitStop, 0.05); }
+    else if (type === 'save') { fx.spawnImpact(ball.x, ball.y, 250); vibrate(10); }
+    else if (type === 'dive') {
+      vibrate(8);
+      if (players && players[ev.side]) fx.spawnSandPuff(players[ev.side].x, GROUND_Y);
+    }
     else if (type === 'netBounce') { fx.spawnImpact(ball.x, ball.y, 200); fx.triggerNetSway(ball.vx > 0 ? 6 : -6); }
     else if (type === 'point') {
       fx.spawnSandPuff(ball.x, ball.y);
       vibrate(30);
-      if (matchBefore) {
+      // ev.winner is only present on events that still carry their full
+      // shape (offline sim, or the online host's own authoritative events).
+      // The online guest's events arrive via the host's snapshot, which only
+      // serializes bare type strings (no side/winner/charge) — skip the
+      // stats/announcer update rather than feed them `undefined` as if it
+      // were a real side, which would silently corrupt streak/comeback
+      // tracking with a wrong-but-plausible-looking banner.
+      if (matchBefore && typeof ev.winner === 'number') {
         stats.recordRallyLength(matchBefore.rallyHits || 0);
         if (matchBefore.rallyHits === 0 && ev.winner === matchBefore.server) stats.recordAce(ev.winner);
         const isSetWin = events.some((e) => e.type === 'setWon');

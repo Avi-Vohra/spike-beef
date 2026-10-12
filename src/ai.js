@@ -1,8 +1,7 @@
 // Pure CPU opponent: given sim state + side + difficulty, returns an input
 // bitmask. No randomness, no DOM — deterministic function of state.
-import {
-  LEFT, RIGHT, JUMP, HIT, PLAYER_RADIUS, BALL_RADIUS, predictLandingPoint,
-} from './physics.js';
+import { LEFT, RIGHT, JUMP, HIT, PLAYER_RADIUS, BALL_RADIUS } from './physics.js';
+import { predictLandingPoint } from './ball.js';
 import { stepRandom } from './rng.js';
 
 // Pure, stateless jitter: a hash of (seed, tick, side) in [0,1). Same state
