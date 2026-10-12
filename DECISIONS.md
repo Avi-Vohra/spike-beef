@@ -592,3 +592,10 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   the stress-test harness's win-share metric is known-noisy, but rally length is one of
   its stable, trustworthy signals and should be checked before keeping any AI behavior
   change, not just the hard pass/fail gates.
+- **Torso highlight stripe**: exported `lighten()` from art.js and added a thin lighter
+  stripe down one side of the torso capsule (offset toward the facing direction) —
+  cheap way to give the one remaining flat-filled major shape (after the ball/head
+  gradient pass) a bit of the same "lit, not flat" read, without the cost of a true
+  gradient on a stroked shape. Verified visually via a zoomed screenshot before keeping
+  it (same discipline as the reverted palm-tree attempt) — reads as a subtle highlight,
+  not distracting.

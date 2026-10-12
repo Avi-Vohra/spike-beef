@@ -92,9 +92,10 @@ export function shadedCircle(ctx, x, y, r, fill, dark, outline = PALETTE.outline
 }
 
 // Blends a hex color toward white by `t` (0..1) — used to synthesize a
-// highlight tone for shadedCircle without needing a second palette color
-// for every round shape.
-function lighten(hex, t) {
+// highlight tone for shadedCircle (and other shapes that want a lighter
+// variant of their own fill) without needing a second palette color for
+// every shape.
+export function lighten(hex, t) {
   const n = parseInt(hex.slice(1), 16);
   const r = (n >> 16) & 0xff;
   const g = (n >> 8) & 0xff;

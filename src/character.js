@@ -2,7 +2,9 @@
 // Split out of render.js to keep that file under the project's file-size
 // guideline.
 import { GROUND_Y, PLAYER_RADIUS, WIDTH } from './physics.js';
-import { PALETTE, shadedCircle, roundRect, capsule, chargeColor } from './art.js';
+import {
+  PALETTE, shadedCircle, roundRect, capsule, chargeColor, lighten,
+} from './art.js';
 
 const LEG_LEN = 15;
 const TORSO_LEN = 17;
@@ -38,8 +40,13 @@ export function drawPlayer(ctx, p, color, colorDark, facingBall, mood = null) {
   capsule(ctx, -4, 0, -4 + legSwing * 0.5, hipY, 9, colorDark);
   capsule(ctx, 4, 0, 4 + legSwing2 * 0.5, hipY, 9, colorDark);
 
-  // Torso
+  // Torso — a thin lighter highlight stripe down one side (offset toward
+  // the facing direction, like light catching the near edge) gives the
+  // single flat capsule fill a bit of the same "lit, not flat" read the
+  // ball/head gradients add, without the cost of a true gradient on a
+  // stroked shape.
   capsule(ctx, 0, hipY, 0, shoulderY, 20, color);
+  capsule(ctx, -facing * 5, hipY - 2, -facing * 5, shoulderY + 2, 6, lighten(color, 0.35), 'transparent');
 
   // Arms — windup while charging, swing-through on a recent hit/spike/tip.
   let armBack = facing * -14;
