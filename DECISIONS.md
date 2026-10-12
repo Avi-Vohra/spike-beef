@@ -540,3 +540,13 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   produced vx 557/516/475 and vy -417/-471/-511 — a real, usable tactical choice.
   Removed the dead `aimDir` field entirely rather than leaving it alongside the new
   mechanic. Full test suite still green.
+- **Tried and reverted: background palm trees + distant islands**. Attempted a
+  procedural palm silhouette (curved trunk + fanned frond strokes) and a hazy distant
+  island hump for extra depth/parallax. Checked it visually via a real screenshot before
+  keeping it, not just by reading the code — and it was bad: the palm's frond fan read
+  as a hand/claw reaching out of the water, not a tree, and the distant island was
+  either invisible (the hump) or looked like stray spikes (the small accent dots).
+  Reverted the whole addition (`git checkout` on render.js, deleted the new scenery.js)
+  rather than ship a worse-looking court. Lesson for next time: a procedural silhouette
+  needs an actual visual check before being kept, same discipline already applied to
+  the sand-corner and net-mesh fixes — "looks right in my head" isn't sufficient for art.
