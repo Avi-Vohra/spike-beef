@@ -190,6 +190,28 @@ function drawConnectionDot(ctx, silentMs) {
   }
 }
 
+// A small bouncing chevron over whoever's about to serve — there was
+// previously NO visual cue for this at all, which matters a lot more in
+// human-vs-human play (CPU opponents don't need to be told, but two people
+// sharing a keyboard or playing online absolutely do: "wait, whose serve is
+// this?" is exactly the kind of ambiguity this whole redesign has been
+// fighting since the original ball-position-only cue is easy to miss).
+function drawServeIndicator(ctx, player, timeSec) {
+  const bounce = Math.abs(Math.sin(timeSec * 4)) * 6;
+  const x = player.x;
+  const y = player.y - 86 - bounce;
+  ctx.fillStyle = PALETTE.chargeMid;
+  ctx.strokeStyle = PALETTE.outline;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - 9, y);
+  ctx.lineTo(x + 9, y);
+  ctx.lineTo(x, y + 11);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+}
+
 function drawBanner(ctx, text) {
   if (!text) return;
   ctx.save();
@@ -231,6 +253,9 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   const mood2 = diff <= -4 ? 'ahead' : diff >= 4 ? 'behind' : null;
   drawPlayer(ctx, p1, PALETTE.p1, PALETTE.p1Dark, state.ball.x - p1.x, mood1);
   drawPlayer(ctx, p2, PALETTE.p2, PALETTE.p2Dark, state.ball.x - p2.x, mood2);
+  if (state.match.phase === 'serve') {
+    drawServeIndicator(ctx, state.players[state.match.server], timeSec);
+  }
   drawBall(ctx, state.ball, spin);
   if (emotes) {
     drawEmoteBubble(ctx, p1, emotes[0]);

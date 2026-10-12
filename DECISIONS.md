@@ -626,3 +626,9 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   power shot reads as motion, not a single static pose. Reuses the exact same arc formula
   as the real hand position (sampled a bit earlier in `progress`), so it can't drift out
   of sync with the actual swing.
+- **Serve indicator**: added a small bouncing chevron above whoever's currently serving
+  during the 'serve' phase — there was previously NO visual cue for this at all, which
+  matters far more in human-vs-human play than vs CPU (two people sharing a keyboard, or
+  two separate devices online, both need to know whose serve it is; a CPU opponent
+  doesn't need telling). Verified visually via screenshot — reads clearly over the
+  server's head. Directly relevant to the 2-player (local + online) focus requested.
