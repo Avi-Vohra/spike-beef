@@ -655,3 +655,15 @@ asked to keep iterating specifically on mechanics feel and graphics, without sto
   longer, more noticeable lockout window. Distinct color/radius from the hit-cooldown
   ring so the two never get confused when they happen to overlap (a dive followed
   immediately by a touch).
+- **Touch-count pips**: small pips above whichever side currently holds the ball, filling
+  in as they use their MAX_TOUCHES(3) allowance — "about to fault on the next touch" was
+  previously only trackable by mentally counting hit sounds, genuinely hard in live play
+  and worse in human-vs-human where both players need to agree on the count. Uses
+  `match.lastToucherSide`/`match.touches[side]` rather than indexing both sides blindly,
+  since the non-active side's touch count is stale leftover data from earlier in the
+  rally (confirmed by reading rules.js's registerTouch, which only resets the NEW
+  toucher's count, never the old one's).
+- Split src/hud.js out of render.js (score, connection dot, serve indicator, touch pips,
+  banner) — render.js had grown to 303 lines across this round's additions, back to 213
+  after the split; hud.js is 98 lines. Verified both still compile and the match renders
+  correctly after the move, not just a syntax check.

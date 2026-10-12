@@ -5,6 +5,9 @@ import { predictLandingPoint } from './ball.js';
 import { PALETTE, shadedCircle } from './art.js';
 import { drawPlayer, drawEmoteBubble } from './character.js';
 import { drawNet } from './net.js';
+import {
+  drawScore, drawConnectionDot, drawServeIndicator, drawTouchPips, drawBanner,
+} from './hud.js';
 
 let bgCanvas = null;
 
@@ -165,76 +168,6 @@ function drawBall(ctx, ball, spin, squash = null) {
   ctx.restore();
 }
 
-export function drawScore(ctx, match) {
-  ctx.font = 'bold 28px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillStyle = PALETTE.ui;
-  ctx.fillText(`${match.score[0]}  -  ${match.score[1]}`, WIDTH / 2, 40);
-  ctx.font = '16px system-ui, sans-serif';
-  ctx.fillText(`sets ${match.sets[0]} - ${match.sets[1]}`, WIDTH / 2, 62);
-}
-
-// Small connection-health dot, top-left — green/yellow/red by how long
-// it's been since anything was heard from the other side. Only drawn when
-// `silentMs` is non-null (i.e. an online match is active).
-function drawConnectionDot(ctx, silentMs) {
-  if (silentMs == null) return;
-  const color = silentMs < 400 ? '#5fd16a' : silentMs < 1500 ? '#f4c842' : '#ff5d5d';
-  ctx.fillStyle = color;
-  ctx.strokeStyle = PALETTE.outline;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.arc(16, 16, 7, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  if (silentMs > 3000) {
-    const secsLeft = Math.max(0, Math.ceil((15000 - silentMs) / 1000));
-    ctx.font = 'bold 20px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillStyle = '#fff';
-    ctx.strokeStyle = PALETTE.outline;
-    ctx.lineWidth = 4;
-    const msg = `Reconnecting... (${secsLeft}s)`;
-    ctx.strokeText(msg, WIDTH / 2, HEIGHT / 2);
-    ctx.fillText(msg, WIDTH / 2, HEIGHT / 2);
-  }
-}
-
-// A small bouncing chevron over whoever's about to serve — there was
-// previously NO visual cue for this at all, which matters a lot more in
-// human-vs-human play (CPU opponents don't need to be told, but two people
-// sharing a keyboard or playing online absolutely do: "wait, whose serve is
-// this?" is exactly the kind of ambiguity this whole redesign has been
-// fighting since the original ball-position-only cue is easy to miss).
-function drawServeIndicator(ctx, player, timeSec) {
-  const bounce = Math.abs(Math.sin(timeSec * 4)) * 6;
-  const x = player.x;
-  const y = player.y - 86 - bounce;
-  ctx.fillStyle = PALETTE.chargeMid;
-  ctx.strokeStyle = PALETTE.outline;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(x - 9, y);
-  ctx.lineTo(x + 9, y);
-  ctx.lineTo(x, y + 11);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-}
-
-function drawBanner(ctx, text) {
-  if (!text) return;
-  ctx.save();
-  ctx.font = 'bold 34px system-ui, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.strokeStyle = PALETTE.outline;
-  ctx.lineWidth = 5;
-  ctx.strokeText(text, WIDTH / 2, 110);
-  ctx.fillStyle = PALETTE.chargeMid;
-  ctx.fillText(text, WIDTH / 2, 110);
-  ctx.restore();
-}
-
 // A static-ish backdrop (background + net, no players/ball/HUD) for screens
 // with no active match state — menus, lobby, etc. Without this the canvas
 // was simply raw black behind every pre-match screen, which looked
@@ -265,6 +198,9 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   drawPlayer(ctx, p2, PALETTE.p2, PALETTE.p2Dark, state.ball.x - p2.x, mood2);
   if (state.match.phase === 'serve') {
     drawServeIndicator(ctx, state.players[state.match.server], timeSec);
+  } else if (state.match.phase === 'rally' && state.match.lastToucherSide !== null) {
+    const side = state.match.lastToucherSide;
+    drawTouchPips(ctx, state.players[side], state.match.touches[side]);
   }
   drawBall(ctx, state.ball, spin, ballSquash);
   if (emotes) {
