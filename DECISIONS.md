@@ -755,3 +755,33 @@ depends on (confirmed by testing: without this, ACE call-outs would never fire a
   serving now being a real timing skill rather than a free near-max-power opener, not
   something chased further given this session's standing policy on not over-tuning
   CPU-vs-CPU aggregate stats).
+
+## New block mechanic: active block (explicit user request: "separate mechanic for blocking")
+The old block was free and automatic: jumping anywhere near the net while NOT charging
+auto-triggered it, zero skill required — essentially an accidental side-effect of
+jumping near the net at the wrong moment, not a deliberate move. Redesigned to be
+genuinely deliberate: hold HIT while jumping at the net, and the TIMING of that jump —
+being near its peak (same window the spike mechanic uses) at the moment of contact — is
+what separates a real block from a mistimed attempt. No release needed (unlike a charged
+hit elsewhere) — holding through the peak IS the action. Off-peak timing while still
+holding HIT near the net costs the charge and produces the same weak 'fumble' deflect as
+any other mistimed contact, instead of a free pass. Implemented by moving the block check
+to the FRONT of resolvePlayerHit's branch chain (`jumping && nearNet && p.charging`),
+ahead of the regular charged-hit/mistimed branches, since it's a more specific case that
+needs to win priority — a released charge (`p.charging` already false by then) still
+correctly falls through to the normal spike/hit/tip logic, so there's no conflict between
+"block near net" and "spike near net," which are different gestures (hold vs release).
+- Updated Test 6d for the new model: confirms (a) holding HIT + jumping + near net + near
+  peak = 'block', (b) the SAME position/timing WITHOUT holding HIT no longer auto-blocks
+  (the core behavior change), (c) holding HIT near the net but off-peak = mistimed
+  'fumble', (d) a block attempt far from the net still doesn't block regardless of timing.
+- **CPU never attempts active blocks** (measured: 0 blocks across 40 CPU-vs-CPU matches,
+  down from the old automatic model's ~398) — same precedent already established for
+  dive ("CPU players never dive... they already reposition with perfect information...
+  diving doesn't add anything for them"). Block is now the same category: a genuine
+  human-skill move for local/online 2-player play, not something the CPU needs built for
+  it. Not a silent gap — explicitly the same accepted design choice as dive.
+- Re-measured balance after this change: average rally length 3.54 over 40 CPU-vs-CPU
+  matches, consistent with the 3.47 baseline right after the serve-mechanic fix (not a
+  new regression — small variance expected from the randomness two independently-tuned
+  mechanics interacting).

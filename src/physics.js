@@ -281,7 +281,36 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   const dirX = p.side === 0 ? 1 : -1;
   let power, steep, eventType;
 
-  if (p.releaseGraceTimer > 0) {
+  const nearNet = Math.abs(p.x - NET_X) < NET_ARC_RANGE;
+
+  if (jumping && nearNet && p.charging) {
+    // ACTIVE BLOCK: a deliberate gesture now (was a free automatic block
+    // before — any jump near the net while not charging triggered it, no
+    // skill required). Now you have to hold HIT as you jump at the net,
+    // like a real block stance, and the TIMING of that jump — being near
+    // its peak (same window the spike uses) at the moment of contact — is
+    // what separates a real block from a whiff. No release needed (unlike
+    // a charged hit): holding through the peak is itself the action.
+    if (nearPeak) {
+      eventType = 'block';
+      power = BLOCK_POWER;
+      ball.vx = dirX * power;
+      ball.vy = -power * BLOCK_STEEP * 0.6;
+    } else {
+      // Mistimed block attempt — jumped at the net and held HIT, but not
+      // at the right moment in the jump arc. Costs the charge, same weak
+      // unaimed deflect as any other mistimed contact.
+      eventType = 'fumble';
+      const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
+      const aimX = inputDirX !== 0 ? inputDirX : dirX;
+      power = DEFAULT_POWER;
+      ball.vx = aimX * power;
+      ball.vy = -power * DEFAULT_STEEP * 0.6;
+      ensureClearsNet(ball);
+    }
+    p.charging = false;
+    p.charge = 0;
+  } else if (p.releaseGraceTimer > 0) {
     const charge = p.releaseCharge;
     const aimX = dirX;
     // Shot placement: whichever movement key is held AT CONTACT (the same
@@ -324,14 +353,6 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
     ensureClearsNet(ball);
-  } else if (jumping && Math.abs(p.x - NET_X) < NET_ARC_RANGE) {
-    // Block: jumping into the ball right at the net without charging punches
-    // it straight down into the opponent's court — fast, flat, no charge
-    // commitment needed, but only works this close to the net.
-    eventType = 'block';
-    power = BLOCK_POWER;
-    ball.vx = dirX * power;
-    ball.vy = -power * BLOCK_STEEP * 0.6;
   } else if (p.diving) {
     // Save: reached the ball via a dive — gets it back over, but only a
     // weak defensive poke, not an attack (matches the real-volleyball feel

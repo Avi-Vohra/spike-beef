@@ -197,33 +197,38 @@ export function run() {
     if (chargedLowClose !== 'cleared') fail(`a lightly-charged hit from 32px should clear the net, got '${chargedLowClose}'`);
   }
 
-  // Test 6d: block — jumping into the ball right at the net without
-  // charging produces a distinct, fast, steep-downward contact (not the
-  // weak default 'touch'), and only when near the net.
+  // Test 6d: active block — now a DELIBERATE gesture (was a free automatic
+  // block before: any jump near the net while uncharged triggered it, zero
+  // skill required). Now blocking requires holding HIT while jumping at
+  // the net, AND timing the jump so contact happens near its peak (same
+  // window the spike uses) — mistiming that window costs the charge and
+  // produces a weak fumble instead of a real block.
   {
-    function contactOutcome(nearNet, jumpingUp) {
+    function contactOutcome(nearNet, jumpingUp, holdingHit, nearPeakVy) {
       const p = createPlayer(0);
       p.x = nearNet ? 480 - 5 : 480 - 300; // NET_X is WIDTH/2 = 480
       p.onGround = !jumpingUp;
-      p.vy = jumpingUp ? -100 : 0;
+      p.vy = jumpingUp ? nearPeakVy : 0;
+      p.charging = holdingHit;
+      p.charge = holdingHit ? 0.3 : 0;
       const ball = createBall(p.x, p.y - 36);
-      resolvePlayerHit(ball, ball.x, ball.y, p, 0, []); // input=0: not holding HIT
+      resolvePlayerHit(ball, ball.x, ball.y, p, holdingHit ? HIT : 0, []);
       return { ball, lastEvent: p.lastEvent };
     }
-    const blocked = contactOutcome(true, true);
-    const farTouch = contactOutcome(false, true);
-    const groundedNearNet = contactOutcome(true, false);
-    if (Math.hypot(blocked.ball.vx, blocked.ball.vy) <= Math.hypot(farTouch.ball.vx, farTouch.ball.vy)) {
-      fail('a block (jumping, at the net, uncharged) should be stronger than a plain touch far from the net');
-    }
+    const blocked = contactOutcome(true, true, true, -100); // near net, jumping, holding HIT, near peak
+    if (blocked.lastEvent !== 'block') fail(`holding HIT while jumping near the net at peak should be a 'block', got '${blocked.lastEvent}'`);
     if (blocked.ball.vy >= 0) fail('a block should send the ball downward');
-    if (blocked.lastEvent !== 'block') fail(`jumping uncharged contact at the net should be a 'block', got '${blocked.lastEvent}'`);
-    // A grounded (non-jumping) contact at the net is still a plain 'touch' —
-    // a DIFFERENT mechanic from 'block' (which requires jumping), even
-    // though right at the net BOTH may now need a strong vertical assist to
-    // physically clear it at all (a real, separately-verified net-clearance
-    // guarantee — see ensureClearsNet / DECISIONS.md). Distinctness of
-    // mechanic, not raw magnitude, is the actual invariant that matters.
+
+    const passiveJump = contactOutcome(true, true, false, -100); // same spot/timing, but NOT holding HIT
+    if (passiveJump.lastEvent === 'block') fail('jumping near the net WITHOUT holding HIT should no longer auto-block (block is now a deliberate gesture)');
+
+    const mistimed = contactOutcome(true, true, true, -560); // holding HIT, near net, but still rising fast (off-peak)
+    if (mistimed.lastEvent !== 'fumble') fail(`holding HIT while jumping near the net but off-peak should be a mistimed 'fumble', got '${mistimed.lastEvent}'`);
+
+    const farFromNet = contactOutcome(false, true, true, -100); // holding HIT, near peak, but far from the net
+    if (farFromNet.lastEvent === 'block') fail('a block attempt far from the net should not block (block still requires being near the net)');
+
+    const groundedNearNet = contactOutcome(true, false, false, 0);
     if (groundedNearNet.lastEvent !== 'touch') {
       fail(`a grounded contact at the net should still be a 'touch', not '${groundedNearNet.lastEvent}' (block requires jumping)`);
     }
