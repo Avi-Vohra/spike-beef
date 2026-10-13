@@ -2,7 +2,7 @@ import {
   WIDTH, HEIGHT, GROUND_Y, NET_X, NET_TOP, NET_HALF_W, BALL_RADIUS,
 } from './physics.js';
 import { predictLandingPoint } from './ball.js';
-import { PALETTE, shadedCircle } from './art.js';
+import { PALETTE, shadedCircle, lighten } from './art.js';
 import { drawPlayer, drawEmoteBubble } from './character.js';
 import { drawNet } from './net.js';
 import {
@@ -195,8 +195,26 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   // which in 2v2 is an entire team. Mood/color are per-player's own side,
   // not per-array-position.
   const diff = (state.match.score ? state.match.score[0] - state.match.score[1] : 0);
+  // teamSize derived from player count (2 for 1v1, 4 for 2v2) rather than
+  // hardcoded — sim.js's createInitialState assigns slots in two
+  // teamSize-sized blocks (side0 = slots 0..teamSize-1, side1 =
+  // teamSize..2*teamSize-1), so `slot % teamSize` is each player's index
+  // WITHIN their own team regardless of mode. For 1v1 (teamSize=1) this is
+  // always 0 (anything % 1 is 0), so the shade variant below never fires —
+  // 1v1 stays exactly as before.
+  const teamSize = state.players.length / 2;
   for (const p of state.players) {
-    const [color, colorDark] = p.side === 0 ? [PALETTE.p1, PALETTE.p1Dark] : [PALETTE.p2, PALETTE.p2Dark];
+    let [color, colorDark] = p.side === 0 ? [PALETTE.p1, PALETTE.p1Dark] : [PALETTE.p2, PALETTE.p2Dark];
+    // 2v2: teammates on the same side were rendering in IDENTICAL colors —
+    // with no other distinguishing mark, there was no way to tell which
+    // character was yours vs. your partner's at a glance, especially once
+    // they're close together or crossing paths near the net. Lighten the
+    // second teammate's color slightly so both stay visually distinct
+    // without introducing a third new color.
+    if (p.slot % teamSize === 1) {
+      color = lighten(color, 0.3);
+      colorDark = lighten(colorDark, 0.3);
+    }
     const mood = (p.side === 0 ? diff >= 4 : diff <= -4) ? 'ahead' : (p.side === 0 ? diff <= -4 : diff >= 4) ? 'behind' : null;
     drawPlayer(ctx, p, color, colorDark, state.ball.x - p.x, mood);
   }

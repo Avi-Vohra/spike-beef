@@ -954,3 +954,15 @@ modules finish their synchronous top-level evaluation), never at module top-leve
 is exactly the case ES modules handle correctly. Confirmed via `node --check` on both
 files AND the full test suite, not just syntax-checked. physics.js now 324 lines, still
 a touch over 300 but not worth a further split; netClearance.js is 75 lines.
+
+## 2v2 polish: distinguish teammates visually (were identical colors)
+Real usability gap found while reviewing the 2v2 render path: both players on the same
+side drew in IDENTICAL colors, with no other distinguishing mark — no way to tell which
+character is yours vs. your partner's at a glance, especially once they're close
+together or crossing paths near the net. Added a lightened color variant for the second
+teammate (`p.slot % teamSize === 1`, where `teamSize = state.players.length / 2` is
+derived from player count rather than hardcoded). Verified the parity math directly
+under Node for both modes before trusting a screenshot: 1v1 gives `[false, false]`
+(slot % 1 is always 0 — the shade variant can never fire, 1v1 stays exactly as before),
+2v2 gives `[false, true, false, true]` (each side's second teammate flagged correctly).
+Confirmed visually that 1v1 renders pixel-identical to before.
