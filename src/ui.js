@@ -23,37 +23,48 @@ export function renderMenu(root, { onLocal2P, onHowToPlay, onCpu, onOnline, mute
   panel.appendChild(title);
 
   const online = button('Online 1v1', true);
+  const online2v2 = button('Online 2v2', true);
   const cpuEasy = button('vs CPU: Easy', true);
   const cpuMedium = button('vs CPU: Medium', true);
   const cpuHard = button('vs CPU: Hard', true);
   const local = button('Local 2P (same keyboard)', true);
   const howTo = button('How to Play', true);
   const mute = button(muted ? 'Sound: Off' : 'Sound: On', true);
-  online.addEventListener('click', onOnline);
+  online.addEventListener('click', () => onOnline(1));
+  online2v2.addEventListener('click', () => onOnline(2));
   cpuEasy.addEventListener('click', () => onCpu('easy'));
   cpuMedium.addEventListener('click', () => onCpu('medium'));
   cpuHard.addEventListener('click', () => onCpu('hard'));
   local.addEventListener('click', onLocal2P);
   howTo.addEventListener('click', onHowToPlay);
   mute.addEventListener('click', onToggleMute);
-  [online, cpuEasy, cpuMedium, cpuHard, local, howTo, mute].forEach((b) => panel.appendChild(b));
+  [online, online2v2, cpuEasy, cpuMedium, cpuHard, local, howTo, mute].forEach((b) => panel.appendChild(b));
   root.appendChild(panel);
 }
 
-export function renderOnlineMenu(root, { onCreate, onJoin, onBack }) {
+// `teamSize` 2 = 2v2: each computer brings TWO local players (same split as
+// Local 2P — P1 on WASD, P2 on Arrows), and the room connects that whole
+// local team against the other computer's local team.
+export function renderOnlineMenu(root, { onCreate, onJoin, onBack, teamSize = 1 }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
   const title = document.createElement('h2');
   title.className = 'sb-title';
-  title.textContent = 'Online 1v1';
+  title.textContent = teamSize === 2 ? 'Online 2v2' : 'Online 1v1';
+  const note = document.createElement('p');
+  note.className = 'sb-text';
+  if (teamSize === 2) {
+    note.textContent = 'Each computer controls one team of 2 (P1: A/D/W/S, P2: Arrow keys) — create or join a room to connect two teams.';
+  }
   const create = button('Create Room');
   const join = button('Join Room');
   const back = button('Back');
   create.addEventListener('click', onCreate);
   join.addEventListener('click', onJoin);
   back.addEventListener('click', onBack);
-  [title, create, join, back].forEach((el) => panel.appendChild(el));
+  const children = teamSize === 2 ? [title, note, create, join, back] : [title, create, join, back];
+  children.forEach((el) => panel.appendChild(el));
   root.appendChild(panel);
 }
 

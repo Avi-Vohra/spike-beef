@@ -68,15 +68,18 @@ function goMenu() {
   });
 }
 
-function goOnlineMenu() {
+let onlineTeamSize = 1; // 1 = Online 1v1, 2 = Online 2v2 — set by the menu choice
+
+function goOnlineMenu(teamSize = 1) {
+  onlineTeamSize = teamSize;
   const name = getStoredName();
   if (!name) {
     appScreen = 'nameEntry';
-    renderNameEntry(overlay, { initial: '', onSubmit: (n) => { setStoredName(n); goOnlineMenu(); }, onBack: goMenu });
+    renderNameEntry(overlay, { initial: '', onSubmit: (n) => { setStoredName(n); goOnlineMenu(teamSize); }, onBack: goMenu });
     return;
   }
   appScreen = 'onlineMenu';
-  renderOnlineMenu(overlay, { onCreate: createRoom, onJoin: () => goJoinEntry(), onBack: goMenu });
+  renderOnlineMenu(overlay, { onCreate: createRoom, onJoin: () => goJoinEntry(), onBack: goMenu, teamSize });
 }
 
 let lobbyState = null;
@@ -98,7 +101,7 @@ function renderLobbyScreen() {
       onlineHandle.sendReady();
       renderLobbyScreen();
     },
-    onCancel: () => { closeOnline(); goOnlineMenu(); },
+    onCancel: () => { closeOnline(); goOnlineMenu(onlineTeamSize); },
   });
 }
 
@@ -128,15 +131,16 @@ function createRoom() {
   appScreen = 'onlineWaiting';
   renderCreateWaiting(overlay, code, {
     onShare: () => shareRoomLink(code),
-    onCancel: () => { closeOnline(); goOnlineMenu(); },
+    onCancel: () => { closeOnline(); goOnlineMenu(onlineTeamSize); },
   });
   onlineHandle = hostOnlineMatch(code, localName, {
     onRemoteName: (remoteName) => showLobby(localName, remoteName),
     onBothReady: startCountdownThenMatch,
-    onError: () => { closeOnline(); goOnlineMenu(); },
+    onError: () => { closeOnline(); goOnlineMenu(onlineTeamSize); },
     onDisconnected: () => { closeOnline(); goMenu(); },
     onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(1); },
     onRematchReady: () => { rematchState.remote = true; tryStartRematch(); },
+    teamSize: onlineTeamSize,
   });
 }
 
@@ -153,7 +157,7 @@ function joinRoom(code) {
   if (!code || code.length !== 4) { goJoinEntry(code, 'Enter the 4-letter room code.'); return; }
   const localName = getStoredName() || 'Player';
   appScreen = 'onlineConnecting';
-  renderConnecting(overlay, 'Connecting...', { onCancel: () => { closeOnline(); goOnlineMenu(); } });
+  renderConnecting(overlay, 'Connecting...', { onCancel: () => { closeOnline(); goOnlineMenu(onlineTeamSize); } });
   onlineHandle = joinOnlineMatch(code, localName, {
     onRemoteName: (remoteName) => showLobby(localName, remoteName),
     onBothReady: startCountdownThenMatch,
@@ -161,6 +165,7 @@ function joinRoom(code) {
     onDisconnected: () => { closeOnline(); goMenu(); },
     onRemoteTaunt: (kind, value) => { receiveRemote(kind, value); stats.recordTaunt(0); },
     onRematchReady: () => { rematchState.remote = true; tryStartRematch(); },
+    teamSize: onlineTeamSize,
   });
 }
 
@@ -261,7 +266,13 @@ function frame(now) {
       const matchBefore = state && state.match
         ? { score: [...state.match.score], server: state.match.server, rallyHits: state.match.rallyHits }
         : null;
-      const localInput = keyboard.getP1() | touch.getMask();
+      // 2v2: this computer's whole local team is P1 (A/D/W/S) + P2 (Arrow
+      // keys), same split as Local 2P — sent as a [teammateA, teammateB]
+      // array. 1v1 stays a single mask (touch controls only ever apply to
+      // the single local player there).
+      const localInput = onlineTeamSize === 2
+        ? [keyboard.getP1() | touch.getMask(), keyboard.getP2()]
+        : keyboard.getP1() | touch.getMask();
       const result = online.tick(localInput);
       acc -= DT;
       const display = online.getDisplayState();

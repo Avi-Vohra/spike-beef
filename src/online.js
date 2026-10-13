@@ -16,51 +16,70 @@ function swapLeftRight(mask) {
   return m;
 }
 
-// Mirrors ball + both players left-right and swaps player order, so the
-// guest's own avatar (world side1) renders first/left — "each player always
+// Mirrors ball + all players left-right and swaps TEAM order, so the
+// guest's own team (world side 1) renders first/left — "each player always
 // sees themselves on the left." The sim itself is never mirrored, only this
-// render-facing copy.
-function mirrorState(s) {
+// render-facing copy. `opponents`/`selves` are each `teamSize`-length
+// arrays; output keeps within-team (slot) order, swaps which team comes
+// first, and explicitly sets `.side` to the NEW visual role (0 = guest's
+// own team, drawn in P1's color; 1 = opponent team, P2's color) since the
+// host's team snapshot entries don't carry their original side (only x/y —
+// same reduced fidelity the opponent's render has always had, since a full
+// animation-state sync was already a scope cut documented earlier this
+// session: "guest's own avatar won't show post-swing follow-through").
+function mirrorTeamsForDisplay(ball, opponents, selves, match) {
+  const mirrorX = (p, side) => ({ ...p, x: WIDTH - p.x, side });
   return {
-    ball: { ...s.ball, x: WIDTH - s.ball.x },
-    players: [
-      { x: WIDTH - s.players[1].x, y: s.players[1].y },
-      { x: WIDTH - s.players[0].x, y: s.players[0].y },
-    ],
-    match: s.match,
+    ball: { ...ball, x: WIDTH - ball.x },
+    players: [...selves.map((p) => mirrorX(p, 0)), ...opponents.map((p) => mirrorX(p, 1))],
+    match,
   };
 }
 
 // `callbacks` ({onTaunt, onRematchReady}) are wired in at construction and
 // stay wired across a rematch() — the same raw transport is reused (same
 // room, no re-connecting), just with a fresh netcode instance underneath.
-function hostController(transport, callbacks) {
-  let net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), callbacks);
+// Exported (alongside the Peer-wrapped hostOnlineMatch/joinOnlineMatch
+// below) so tests can exercise the actual display-state logic directly
+// over a LoopbackTransport, without needing window.Peer — this is exactly
+// the layer that had a real bug this session (getRenderState()'s field
+// names changed from singular opponent/self to plural opponents/selves for
+// 2v2, and this file's old mirrorState() call site wasn't updated to
+// match, so an online GUEST's screen would have crashed on the very next
+// render — caught only by reading the code after the rename, not by the
+// existing test suite, since net.test.mjs only ever checked
+// getRenderState().ball, never .opponent/.self specifically).
+export function hostController(transport, callbacks, teamSize = 1) {
+  let net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff, teamSize), { ...callbacks, teamSize });
   return {
     isHost: true,
-    tick(localInput) { return net.tick(localInput); },
+    tick(localInputs) { return net.tick(localInputs); },
     getDisplayState() { return net.getState(); },
     sendTaunt: (...a) => net.sendTaunt(...a),
     sendRematchReady: (...a) => net.sendRematchReady(...a),
     getSilentMs: (...a) => net.getSilentMs(...a),
-    rematch() { net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff), callbacks); },
+    rematch() { net = createHostNetcode(transport, createInitialState(Date.now() & 0xffffffff, teamSize), { ...callbacks, teamSize }); },
   };
 }
 
-function guestController(transport, callbacks) {
-  let net = createGuestNetcode(transport, callbacks);
+export function guestController(transport, callbacks, teamSize = 1) {
+  let net = createGuestNetcode(transport, { ...callbacks, teamSize });
   return {
     isHost: false,
-    tick(localInput) { net.tick(swapLeftRight(localInput)); return { events: net.drainEvents() }; },
+    tick(localInputs) {
+      const swapped = Array.isArray(localInputs) ? localInputs.map(swapLeftRight) : swapLeftRight(localInputs);
+      net.tick(swapped);
+      return { events: net.drainEvents() };
+    },
     getDisplayState() {
       const r = net.getRenderState();
       if (!r.ball || !r.match) return null;
-      return mirrorState({ ball: r.ball, players: [r.opponent, r.self], match: r.match });
+      return mirrorTeamsForDisplay(r.ball, r.opponents, r.selves, r.match);
     },
     sendTaunt: (...a) => net.sendTaunt(...a),
     sendRematchReady: (...a) => net.sendRematchReady(...a),
     getSilentMs: (...a) => net.getSilentMs(...a),
-    rematch() { net = createGuestNetcode(transport, callbacks); },
+    rematch() { net = createGuestNetcode(transport, { ...callbacks, teamSize }); },
   };
 }
 
@@ -97,7 +116,11 @@ function runLobbyHandshake(transport, localName, { onRemoteName, onBothReady }) 
 // networks just won't connect. onRematchReady fires whenever the OTHER side
 // signals "run it back" — including after the match has ended, since the
 // controller (and its transport.onMessage handler) is still alive then.
-export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady }) {
+// `teamSize` 1 = Online 1v1 (unchanged), 2 = Online 2v2 — the host decides
+// (it's the one creating the room/match state); the guest just needs to
+// agree on the same value, which the mode selection on both sides already
+// guarantees (both players pick "Online 2v2" from the same menu entry).
+export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady, teamSize = 1 }) {
   let lobby = null;
   const callbacks = { onTaunt: onRemoteTaunt, onRematchReady };
   const peerCtrl = createPeerHost(code, {
@@ -105,7 +128,7 @@ export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, on
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(hostController(transport, callbacks)),
+        onBothReady: () => onBothReady(hostController(transport, callbacks, teamSize)),
       });
     },
     onError,
@@ -113,7 +136,7 @@ export function hostOnlineMatch(code, localName, { onRemoteName, onBothReady, on
   return { close: peerCtrl.close, sendReady: () => lobby && lobby.sendReady() };
 }
 
-export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady }) {
+export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, onError, onDisconnected, onRemoteTaunt, onRematchReady, teamSize = 1 }) {
   let lobby = null;
   const callbacks = { onTaunt: onRemoteTaunt, onRematchReady };
   const peerCtrl = createPeerGuest(code, {
@@ -121,7 +144,7 @@ export function joinOnlineMatch(code, localName, { onRemoteName, onBothReady, on
       transport.onClose(() => onDisconnected && onDisconnected());
       lobby = runLobbyHandshake(transport, localName, {
         onRemoteName,
-        onBothReady: () => onBothReady(guestController(transport, callbacks)),
+        onBothReady: () => onBothReady(guestController(transport, callbacks, teamSize)),
       });
     },
     onError,

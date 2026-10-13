@@ -843,3 +843,59 @@ are per-side (the taunt bar is one shared UI control, not per local player) and 
 show above each side's first teammate in 2v2. Verified 1v1 renders pixel-identical
 to before via screenshot — this was purely a generalization, not a visual change for
 the existing mode.
+
+## 2v2 team mode, part 3: netcode extension, menu, and a live-connection investigation
+- Generalized `netcode.js` for configurable `teamSize` (1 or 2): host receives/applies
+  `teamSize`-length guest input arrays (was a single value), snapshot packets carry
+  `2*teamSize` player positions (was a fixed 2), and the guest predicts `teamSize` local
+  avatars + interpolates `teamSize` opponents (was exactly 1 of each). 1v1's wire format
+  and behavior are unchanged (teamSize defaults to 1 everywhere).
+- **Found and fixed a real crash-class bug in `online.js`** while doing this: renaming
+  `getRenderState()`'s fields from singular `opponent`/`self` to plural
+  `opponents`/`selves` (required for 2v2) left `online.js`'s `guestController` still
+  reading the OLD field names — `r.opponent`/`r.self`, now always `undefined`. This
+  would have crashed on the very first render of ANY online match (1v1 included, not
+  just 2v2), the moment a guest connected. The existing test suite did NOT catch this:
+  `net.test.mjs` only ever asserted on `getRenderState().ball`, never `.opponent`/`.self`
+  specifically. Fixed by rewriting `mirrorTeamsForDisplay` to work off the arrays, and
+  added a new integration test (exported `hostController`/`guestController` from
+  online.js specifically for this) that drives the REAL display-building layer — not
+  just the lower-level netcode functions — over LoopbackTransport for both teamSize 1
+  and 2, asserting the right player count, valid sides, and the guest's own team drawn
+  first. This is exactly the kind of bug "tests still pass" can hide if the test doesn't
+  happen to touch the renamed field — a reminder to test the actual consumer, not just
+  the producer, when renaming a shared data shape.
+- Added "Online 2v2" to the main menu, a `teamSize`-aware `renderOnlineMenu`, and wired
+  `onlineTeamSize` through `goOnlineMenu`/`createRoom`/`joinRoom` in main.js. The match
+  loop now sends `[keyboard.getP1()|touch, keyboard.getP2()]` as the local team's inputs
+  when `onlineTeamSize===2` (same P1=WASD/P2=Arrows split as Local 2P), vs. a single
+  mask for 1v1. **Found and fixed a real UX bug while wiring this**: three separate
+  "Cancel" buttons in the online flow (waiting screen, lobby, connecting screen) called
+  `goOnlineMenu()` with no argument, silently defaulting back to teamSize 1 — so
+  canceling out of a 2v2 room would drop you into the 1v1 menu without any indication
+  the mode had changed. Fixed all three to pass `onlineTeamSize` through.
+- **Live two-tab connection test**: created a room from one tab, joined from a second —
+  got as far as real PeerJS signaling (a room code was issued, "Connecting..." appeared
+  on the joining side), but the WebRTC handshake never completed within several minutes
+  of real wall-clock time. Investigated rather than assumed-broken: checked
+  `document.hidden` on the backgrounded tab (true, same as the rAF-throttling finding
+  documented earlier this session), and — critically — ran the exact same two-tab test
+  against the EXISTING, unmodified Online 1v1 path as a control. It showed the IDENTICAL
+  stuck-at-"Connecting..." symptom. Since 1v1's connection code was not touched by this
+  session's changes at all, this confirms the failure is a limitation of testing two
+  simultaneous live connections in this single-window browser-automation environment
+  (only one tab is ever truly foregrounded, throttling the other's timers badly enough
+  to stall WebRTC signaling) — not a bug in the 2v2 work, and not something fixable from
+  inside this codebase. Recorded here so a future "it won't connect" report in THIS
+  testing environment isn't mistaken for a new regression without first running this
+  same 1v1 control check.
+- **What this means for confidence in 2v2 online**: the sim/rules/netcode/display logic
+  is thoroughly verified (Node tests, including a full real match with all 4 players
+  actively playing, plus the new online.js integration test over LoopbackTransport with
+  simulated network delay/loss). The one layer that could NOT be verified end-to-end in
+  this session is a real two-device WebRTC handshake, for the same reason the existing
+  1v1 mode's real-device behavior was never independently re-verified this session
+  either — that requires two actual separate devices/browsers, which this tooling
+  cannot provide. The user should treat this the same way as any other online feature
+  in this project: the logic is sound and tested as thoroughly as this environment
+  allows, but a real two-phone/two-computer check is the way to confirm it fully.

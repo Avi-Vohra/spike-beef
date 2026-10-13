@@ -3,6 +3,8 @@ import { isMatchWon } from '../src/rules.js';
 import { aiInput } from '../src/ai.js';
 import { createFakeClock, createLoopbackPair } from '../src/transport.js';
 import { createHostNetcode, createGuestNetcode, SNAPSHOT_EVERY_N_TICKS, INTERP_DELAY_TICKS } from '../src/netcode.js';
+import { hostController, guestController } from '../src/online.js';
+import { HIT } from '../src/physics.js';
 import { fail } from './helpers.mjs';
 
 const DT_MS = 1000 / 60;
@@ -155,5 +157,52 @@ export function run() {
       fail(`net test (c): guest saw more events (${r.guestEventCount}) than host generated (${r.hostEventCount})`);
     }
     if (r.avgError > 120) fail(`net test (c): average guest ball position error too high: ${r.avgError.toFixed(1)}px`);
+  }
+
+  // Test 16: online.js's actual controller/display layer (hostController/
+  // guestController), not just the lower-level netcode.js functions above —
+  // this is the layer that had a real bug this session: getRenderState()'s
+  // fields were renamed (opponent/self -> opponents/selves) for 2v2, and
+  // online.js's own display-building code wasn't updated to match, which
+  // would have crashed an online GUEST's very first render. Runs both
+  // teamSize 1 (1v1) and 2 (2v2) through a few real ticks over
+  // LoopbackTransport and asserts getDisplayState() returns a sane,
+  // correctly-shaped result — not just "didn't throw."
+  for (const teamSize of [1, 2]) {
+    const clock = createFakeClock();
+    const [hostTransport, guestTransport] = createLoopbackPair(clock, { delayMs: 20, seed: 7 });
+    const host = hostController(hostTransport, {}, teamSize);
+    const guest = guestController(guestTransport, {}, teamSize);
+    const hostInputsPerTeammate = new Array(teamSize).fill(0);
+    const guestInputsPerTeammate = new Array(teamSize).fill(0);
+    let guestDisplay = null;
+    for (let i = 0; i < 40; i++) {
+      host.tick(teamSize === 1 ? hostInputsPerTeammate[0] : hostInputsPerTeammate);
+      guest.tick(teamSize === 1 ? guestInputsPerTeammate[0] : guestInputsPerTeammate);
+      clock.advance(DT_MS);
+      const d = guest.getDisplayState();
+      if (d) guestDisplay = d;
+    }
+    if (!guestDisplay) fail(`teamSize=${teamSize}: guest.getDisplayState() never returned a result within 40 ticks`);
+    const expectedPlayers = teamSize * 2;
+    if (guestDisplay.players.length !== expectedPlayers) {
+      fail(`teamSize=${teamSize}: guest display expected ${expectedPlayers} players, got ${guestDisplay.players.length}`);
+    }
+    for (const p of guestDisplay.players) {
+      if (typeof p.x !== 'number' || Number.isNaN(p.x)) fail(`teamSize=${teamSize}: a displayed player has a non-numeric x`);
+      if (p.side !== 0 && p.side !== 1) fail(`teamSize=${teamSize}: a displayed player has an invalid side '${p.side}'`);
+    }
+    // First `teamSize` entries must be the guest's own team (side 0 after
+    // the display-mirror, per mirrorTeamsForDisplay's documented contract).
+    for (let i = 0; i < teamSize; i++) {
+      if (guestDisplay.players[i].side !== 0) fail(`teamSize=${teamSize}: expected the guest's own team first in the display, got side ${guestDisplay.players[i].side} at index ${i}`);
+    }
+    const hostDisplay = host.getDisplayState();
+    if (!hostDisplay || !hostDisplay.ball || Number.isNaN(hostDisplay.ball.x)) {
+      fail(`teamSize=${teamSize}: host.getDisplayState() missing or invalid ball`);
+    }
+    if (hostDisplay.players.length !== expectedPlayers) {
+      fail(`teamSize=${teamSize}: host display expected ${expectedPlayers} players, got ${hostDisplay.players.length}`);
+    }
   }
 }
