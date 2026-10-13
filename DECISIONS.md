@@ -1008,3 +1008,28 @@ any UI around it — the selection screen is the next piece.
   built for human-vs-human/online play; it's expected to underperform specifically
   against CPU opponents, and that's noted directly in its roster.js comment so it isn't
   mistaken for an unnoticed bug later.
+
+## Character-select screen built and wired in (shipped, not just planned)
+New `characterSelect.js` renders a 2x2 card grid (name, tagline, accent-colored swatch,
+auto-generated strength/weakness readout from the traits object) for all 4 roster
+characters. Wired into `startLocal2P` (shown once per local player, chained) and
+`startVsCpu` (shown once for the human; CPU gets a random character for visual variety).
+Added matching CSS (`.sb-char-grid`/`.sb-char-card`/etc) to style.css.
+- **Found and fixed a real CSS-not-applying issue while testing**: the new grid styles
+  weren't rendering at all (cards stacked in one wide row, not a 2x2 grid) — confirmed
+  via `getComputedStyle` that `gridTemplateColumns` was `none` even though `curl`ing the
+  server showed the CSS was already on disk and served correctly. This was the browser
+  serving a stale CACHED style.css specifically (the no-cache devserver fix earlier this
+  session covered JS module staleness; apparently this tab had style.css cached from
+  before that server was even running). A hard reload (cmd+shift+r) fixed it — noting
+  this because it's a second instance of "don't trust a live-browser check without ruling
+  out stale cache first," same lesson as the How-to-Play text earlier.
+- **Found and fixed a real crash via the live browser check (not caught by Node tests,
+  since this is DOM-only rendering code)**: `render.js`'s serve-indicator and
+  touch-pip drawing did `state.players.find(p => p.side === ...)` without checking
+  whether a match was actually found before using the result — under some phase/timing
+  edge case this threw `TypeError: Cannot read properties of undefined` every frame,
+  visible directly in the console. Fixed with a simple existence guard before each draw
+  call. Verified the fix by clearing the console log and confirming a fresh read came
+  back clean after reproducing the same flow (menu -> vs CPU -> character select ->
+  match), not just assuming the one-line fix worked.

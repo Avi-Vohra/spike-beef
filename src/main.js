@@ -9,6 +9,8 @@ import {
   renderNameEntry, renderLobby, renderCountdown, renderForfeitResult,
 } from './ui.js';
 import { createAi } from './ai.js';
+import { renderCharacterSelect } from './characterSelect.js';
+import { CHARACTERS, getCharacter } from './roster.js';
 import { randomRoomCode } from './transport.js';
 import { hostOnlineMatch, joinOnlineMatch } from './online.js';
 import { acquireWakeLock, releaseWakeLock, getStoredName, setStoredName, shareUrl, getH2H, recordH2H } from './device.js';
@@ -184,16 +186,33 @@ function enterReplay() {
 
 function startOnlineMatch() { cpu = null; enterMatch(); }
 
+// Character-select: shown before Local 2P (once per local player) and vs
+// CPU (once, for the human — the CPU gets a random character for visual
+// variety; see roster.js for why that's a fine balance tradeoff for every
+// character except Sky, whose CPU-specific weakness only makes "easier
+// opponent" more likely, not less fair).
+function goCharSelect(title, onChoose) {
+  appScreen = 'charSelect';
+  renderCharacterSelect(overlay, { title, onChoose, onBack: goMenu });
+}
+
 function startLocal2P() {
-  cpu = null;
-  state = createInitialState(Date.now() & 0xffffffff);
-  enterMatch();
+  goCharSelect('Player 1: choose your character', (charIdP1) => {
+    goCharSelect('Player 2: choose your character', (charIdP2) => {
+      cpu = null;
+      state = createInitialState(Date.now() & 0xffffffff, 1, [getCharacter(charIdP1).traits, getCharacter(charIdP2).traits]);
+      enterMatch();
+    });
+  });
 }
 
 function startVsCpu(difficulty) {
-  cpu = createAi(1, difficulty);
-  state = createInitialState(Date.now() & 0xffffffff);
-  enterMatch();
+  goCharSelect('Choose your character', (charIdP1) => {
+    cpu = createAi(1, difficulty);
+    const cpuChar = CHARACTERS[Math.floor(Math.random() * CHARACTERS.length)];
+    state = createInitialState(Date.now() & 0xffffffff, 1, [getCharacter(charIdP1).traits, cpuChar.traits]);
+    enterMatch();
+  });
 }
 
 function onMatchEnd() {

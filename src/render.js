@@ -224,7 +224,7 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
     // players. The lowest-slot teammate on that side is the one serving
     // (see sim.js) — find() with array order (ascending slot) matches that.
     const server = state.players.find((p) => p.side === state.match.server);
-    drawServeIndicator(ctx, server, timeSec);
+    if (server) drawServeIndicator(ctx, server, timeSec);
   } else if (state.match.phase === 'rally' && state.match.lastToucherSide !== null) {
     const side = state.match.lastToucherSide;
     // Touch pips show above whichever teammate most recently touched it —
@@ -232,7 +232,7 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
     // since the match state doesn't track exactly which individual
     // teammate last touched, only the team/side.
     const toucher = state.players.find((p) => p.side === side);
-    drawTouchPips(ctx, toucher, state.match.touches[side]);
+    if (toucher) drawTouchPips(ctx, toucher, state.match.touches[side] || 0);
   }
   drawBall(ctx, state.ball, spin, ballSquash);
   if (emotes) {
