@@ -102,7 +102,7 @@ export function step(state, inputP1OrArray, inputP2) {
 
   for (const p of next.players) {
     updateCharge(p, inputs[p.slot], DT);
-    if (updateDive(p, inputs[p.slot], DT, next.ball)) events.push({ type: 'dive', side: p.side });
+    if (updateDive(p, inputs[p.slot], DT, next.ball)) events.push({ type: 'dive', side: p.side, slot: p.slot });
   }
   for (let s = 0; s < SUBSTEPS; s++) {
     for (const p of next.players) stepPlayer(p, inputs[p.slot], DT / SUBSTEPS);

@@ -52,7 +52,13 @@ export function processEvents(events, ball, matchBefore = null, players = null) 
     else if (type === 'save') { fx.spawnImpact(ball.x, ball.y, 250, outAngle); vibrate(10); }
     else if (type === 'dive') {
       vibrate(8);
-      if (players && players[ev.side]) fx.spawnSandPuff(players[ev.side].x, GROUND_Y);
+      // .find() by slot, not players[ev.side] — `side` is a TEAM value
+      // (0/1), not a safe array index once a side holds more than one
+      // player (2v2): players[1] would grab team0's SECOND player instead
+      // of team1's diver, putting the sand-puff fx in the wrong spot
+      // entirely. ev.slot uniquely identifies which exact player dove.
+      const diver = players && players.find((p) => p.slot === ev.slot);
+      if (diver) fx.spawnSandPuff(diver.x, GROUND_Y);
     }
     else if (type === 'netBounce') { fx.spawnImpact(ball.x, ball.y, 200); fx.triggerNetSway(ball.vx > 0 ? 6 : -6); }
     else if (type === 'point') {

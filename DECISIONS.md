@@ -926,3 +926,17 @@ as `[{...players[0]}, {...players[1]}]`, silently dropping any player past index
 match's slow-motion final-point replay would have shown only 2 of the 4 players. Fixed with
 `state.players.map(p => ({...p}))`. The only other direct-index hit (`ai.js`) is the
 existing 1v1 CPU code, correctly unreached in 2v2 (no CPU support there, by design).
+
+## 2v2 polish: fixed dive sand-puff fx using the wrong player in 2v2
+Found via a continued sweep for `players[ev.side]`-style direct indexing (same bug class
+as render.js/replay.js): `gameEvents.js`'s dive handler did `players[ev.side]` to find
+WHO dove and position the sand-puff particle burst at their feet — `ev.side` is a TEAM
+value (0/1), not a safe array index once a side holds more than one player. Verified the
+exact failure mode directly: for team1's second player (slot 3) diving, the old lookup
+`players[1]` would grab team0's SECOND player (x=200) instead of the actual diver
+(x=800) — the sand-puff would appear at a teammate's feet on the completely wrong side
+of the court. Fixed by adding `slot` to the dive event in sim.js (events only carried
+`side` before) and switching gameEvents.js to `players.find(p => p.slot === ev.slot)`.
+Online guests still get no sand-puff for a dive (unchanged, already-accepted gap — the
+host's snapshot only ever serializes bare event type strings, stripping side/slot same
+as every other event field), but the common offline/host case is now correct for 2v2.
