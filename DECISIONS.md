@@ -918,3 +918,11 @@ sides now have two). Added a `teamSize` param: 2v2 shows "Red Team"/"Blue Team" 
 the actual on-court colors), 1v1 keeps the existing "P1"/"P2" wording. Threaded through
 from main.js's `onMatchEnd` using the same `onlineTeamSize` already tracked for the
 online flow (local/CPU matches are always 1v1, so default to that).
+
+## 2v2 polish: fixed a missed hardcoded-2-player spot in replay.js
+Swept for remaining `players[0]`/`players[1]` direct-index assumptions after the render.js
+fix (same bug class) and found one more: `replay.js`'s `record()` built each buffered frame
+as `[{...players[0]}, {...players[1]}]`, silently dropping any player past index 1 — a 2v2
+match's slow-motion final-point replay would have shown only 2 of the 4 players. Fixed with
+`state.players.map(p => ({...p}))`. The only other direct-index hit (`ai.js`) is the
+existing 1v1 CPU code, correctly unreached in 2v2 (no CPU support there, by design).

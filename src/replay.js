@@ -10,7 +10,11 @@ export function record(state) {
   if (state.match.phase !== 'rally') return;
   buffer.push({
     ball: { ...state.ball },
-    players: [{ ...state.players[0] }, { ...state.players[1] }],
+    // .map(), not a fixed [players[0], players[1]] pair — that silently
+    // dropped any player past index 1, which in 2v2 is an entire team
+    // (same bug class fixed in render.js earlier: a replay of a 2v2 final
+    // point would have shown only 2 of the 4 players).
+    players: state.players.map((p) => ({ ...p })),
     match: { score: [...state.match.score], sets: [...state.match.sets], phase: state.match.phase },
   });
   if (buffer.length > CAP) buffer.shift();
