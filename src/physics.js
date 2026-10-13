@@ -1,5 +1,6 @@
 // Pure physics: ball, players, collisions. No DOM, no window.
 import { ensureClearsNet } from './netClearance.js';
+import { DEFAULT_TRAITS } from './roster.js';
 
 export const WIDTH = 960;
 export const HEIGHT = 540;
@@ -107,10 +108,14 @@ function lerp(a, b, t) { return a + (b - a) * t; }
 // `xOffset` spreads 2v2 teammates apart so they don't start stacked on the
 // exact same spot (the engine has no player-vs-player collision, so nothing
 // breaks if they overlap, but it looks wrong).
-export function createPlayer(side, slot = side, xOffset = 0) {
+// `traits` (see roster.js) is a character choice's stat multipliers —
+// defaults to all-1 (no change from base), so a player with no character
+// chosen (CPU, or any existing caller that doesn't pass this) behaves
+// exactly as before this system existed.
+export function createPlayer(side, slot = side, xOffset = 0, traits = DEFAULT_TRAITS) {
   const x = (side === 0 ? WIDTH * 0.25 : WIDTH * 0.75) + xOffset;
   return {
-    side, slot, xOffset, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
+    side, slot, xOffset, traits, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
     charging: false, charge: 0, justReleased: false, releaseCharge: 0,
     releaseGraceTimer: 0,
     diving: false, diveTimer: 0, diveCooldownTimer: 0, diveDir: 0,
@@ -143,7 +148,7 @@ export function updateCharge(p, input, dt) {
   } else if (p.charging) {
     p.justReleased = true;
     p.releaseCharge = p.charge;
-    p.releaseGraceTimer = RELEASE_GRACE_SECONDS;
+    p.releaseGraceTimer = RELEASE_GRACE_SECONDS * p.traits.graceMult;
     p.charging = false;
     p.charge = 0;
   }
@@ -164,8 +169,8 @@ export function stepPlayer(p, input, dt) {
     p.vx = p.diveDir * DIVE_SPEED;
   } else {
     const dirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
-    const target = dirX * MOVE_SPEED;
-    const accel = dirX !== 0 ? MOVE_ACCEL : MOVE_DECEL;
+    const target = dirX * MOVE_SPEED * p.traits.speedMult;
+    const accel = (dirX !== 0 ? MOVE_ACCEL : MOVE_DECEL) * p.traits.speedMult;
     const maxStep = accel * dt;
     const delta = target - p.vx;
     p.vx += Math.max(-maxStep, Math.min(maxStep, delta));
@@ -176,7 +181,7 @@ export function stepPlayer(p, input, dt) {
   p.runPhase += Math.abs(p.vx) * dt * 0.02;
 
   if (p.onGround && !p.diving && (input & JUMP)) {
-    p.vy = JUMP_VY;
+    p.vy = JUMP_VY * p.traits.jumpMult;
     p.onGround = false;
   }
 
@@ -205,7 +210,11 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   const dx = ball.x - p.x;
   const dy = ball.y - p.y;
   const dist = Math.hypot(dx, dy);
-  const minDist = BALL_RADIUS + PLAYER_RADIUS;
+  // hitRadiusMult (Rookie's forgiving-reach trait) only widens the ball's
+  // own radius for this check, not PLAYER_RADIUS itself — keeps the
+  // player's drawn silhouette and movement bounds unaffected, only how
+  // generous contact detection is.
+  const minDist = BALL_RADIUS * p.traits.hitRadiusMult + PLAYER_RADIUS;
   if (dist >= minDist) return false;
 
   const nx = dist === 0 ? 0 : dx / dist;
@@ -217,7 +226,15 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
   ball.y = Math.max(BALL_RADIUS, p.y + ny * minDist);
 
   const jumping = !p.onGround;
-  const nearPeak = jumping && Math.abs(p.vy) < NEAR_PEAK_VY;
+  // peakWindowMult widens how forgiving "near the top of your jump" is for
+  // spike/block timing (Sky's trait) — a raw jump-HEIGHT change alone was
+  // measured to make CPU-vs-CPU win rate collapse to 0/30 regardless of
+  // magnitude: ai.js's jump-decision timing (jumpThreshold, releaseLead)
+  // isn't trait-aware, so a taller jump arc just desyncs the AI's existing
+  // spike timing rather than helping it. A wider timing window is both a
+  // cleaner "jumper" skill identity (easier aerial timing, not just more
+  // height) and doesn't fight the AI's fixed heuristics the same way.
+  const nearPeak = jumping && Math.abs(p.vy) < NEAR_PEAK_VY * p.traits.peakWindowMult;
   const dirX = p.side === 0 ? 1 : -1;
   let power, steep, eventType;
 
@@ -233,7 +250,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     // a charged hit): holding through the peak is itself the action.
     if (nearPeak) {
       eventType = 'block';
-      power = BLOCK_POWER;
+      power = BLOCK_POWER * p.traits.powerMult;
       ball.vx = dirX * power;
       ball.vy = -power * BLOCK_STEEP * 0.6;
     } else {
@@ -243,7 +260,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
       eventType = 'fumble';
       const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
       const aimX = inputDirX !== 0 ? inputDirX : dirX;
-      power = DEFAULT_POWER;
+      power = DEFAULT_POWER * p.traits.powerMult;
       ball.vx = aimX * power;
       ball.vy = -power * DEFAULT_STEEP * 0.6;
       ensureClearsNet(ball);
@@ -264,15 +281,15 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     const awayBit = dirX > 0 ? LEFT : RIGHT;
     const placement = (input & towardBit) ? 1 : (input & awayBit) ? -1 : 0;
     if (charge >= SPIKE_MIN_CHARGE && jumping && nearPeak) {
-      power = lerp(SPIKE_MIN_POWER, SPIKE_MAX_POWER, charge);
+      power = lerp(SPIKE_MIN_POWER, SPIKE_MAX_POWER, charge) * p.traits.powerMult;
       steep = 0.5;
       eventType = 'spike';
     } else if (charge < TIP_CHARGE_THRESHOLD) {
-      power = TIP_POWER;
+      power = TIP_POWER * p.traits.powerMult;
       steep = 2.2 * (1 - placement * 0.18);
       eventType = 'tip';
     } else {
-      power = lerp(MIN_CHARGE_POWER, MAX_CHARGE_POWER, charge) * (1 + placement * 0.08);
+      power = lerp(MIN_CHARGE_POWER, MAX_CHARGE_POWER, charge) * (1 + placement * 0.08) * p.traits.powerMult;
       steep = lerp(2.0, 1.2, charge) * (1 - placement * 0.18);
       eventType = 'hit';
     }
@@ -289,7 +306,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     eventType = 'fumble';
     const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
     const aimX = inputDirX !== 0 ? inputDirX : dirX;
-    power = DEFAULT_POWER;
+    power = DEFAULT_POWER * p.traits.powerMult;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
     ensureClearsNet(ball);
@@ -300,7 +317,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     eventType = 'save';
     const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
     const aimX = inputDirX !== 0 ? inputDirX : dirX;
-    power = DEFAULT_POWER;
+    power = DEFAULT_POWER * p.traits.powerMult;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
     ensureClearsNet(ball);
@@ -310,7 +327,7 @@ export function resolvePlayerHit(ball, prevX, prevY, p, input, events) {
     eventType = 'touch';
     const inputDirX = (input & RIGHT ? 1 : 0) - (input & LEFT ? 1 : 0);
     const aimX = inputDirX !== 0 ? inputDirX : dirX;
-    power = DEFAULT_POWER;
+    power = DEFAULT_POWER * p.traits.powerMult;
     ball.vx = aimX * power;
     ball.vy = -power * DEFAULT_STEEP * 0.6;
     ensureClearsNet(ball);

@@ -966,3 +966,45 @@ under Node for both modes before trusting a screenshot: 1v1 gives `[false, false
 (slot % 1 is always 0 — the shade variant can never fire, 1v1 stays exactly as before),
 2v2 gives `[false, true, false, true]` (each side's second teammate flagged correctly).
 Confirmed visually that 1v1 renders pixel-identical to before.
+
+## New feature: character roster with real stat tradeoffs (explicit user request)
+User asked for "a whole starting screen that lets you choose different players who have
+different skills that can help and different weaknesses." Built the underlying trait
+system first (physics.js/roster.js), verified via extensive measurement before building
+any UI around it — the selection screen is the next piece.
+- `createPlayer(side, slot, xOffset, traits)`: `traits` (new 5th param, defaults to
+  `DEFAULT_TRAITS` = all multipliers at 1, i.e. no change) is stored on the player and
+  read by `stepPlayer` (speedMult on MOVE_SPEED/ACCEL, jumpMult on JUMP_VY),
+  `updateCharge` (graceMult on RELEASE_GRACE_SECONDS), and `resolvePlayerHit`
+  (powerMult on every power formula, hitRadiusMult widening the ball's effective
+  collision radius only — not PLAYER_RADIUS itself, so the drawn silhouette/movement
+  bounds stay normal-sized — and peakWindowMult widening the spike/block "near jump
+  peak" timing check). `createInitialState(seed, teamSize, traitsBySlot)` takes an
+  optional per-slot traits array. **Found and fixed a real bug while wiring this up**:
+  sim.js's per-point player reset (`createPlayer(p.side, p.slot, p.xOffset)`, run at the
+  start of every new point) didn't pass `p.traits` through — a chosen character would
+  have silently reset to default stats after the very first point of every match.
+- **Balance tuning was measured, not guessed, and the measurement taught a real lesson**:
+  an initial roster with a pure +15%/-12% power/speed tradeoff for a "power" character
+  went 20/20 against a neutral baseline over 20 CPU-vs-CPU matches — power turned out to
+  be wildly high-leverage (it scales literally every hit's velocity, compounding across
+  many hits per match) compared to speed or jump, which barely move the needle even at
+  huge magnitudes (tested up to +100% speed with a -5% power penalty: still 0/20, i.e.
+  even double speed can't compensate for a small power cut). Retuned to keep power
+  deltas small (±4-6%) and let speed/hit-radius/grace deltas be proportionally larger,
+  since they're much lower-leverage. Added Test 9 (stress.test.mjs) as a permanent
+  regression guard: each non-Sky character must land between 3/20 and 17/20 wins against
+  a neutral baseline, so a future unrelated constant change (e.g. retuning
+  MAX_CHARGE_POWER) can't silently re-break this balance unnoticed.
+- **Sky (the jump character) is a documented, deliberate exception to that guard** — not
+  a bug. Root-caused why a pure jump-height/wider-peak-window buff (zero other change)
+  still lost consistently against CPU: `ai.js`'s jump-decision timing (`jumpThreshold`,
+  `releaseLead`) isn't trait-aware, so a taller jump arc desyncs the CPU's existing spike
+  timing rather than helping it — confirmed directly by comparing per-side event counts
+  in one measured match: the jump-boosted side landed 24 spikes vs. the baseline
+  opponent's 46, despite having the "better" jump stat. This is the same category of
+  accepted limitation already documented for dive and active-block: the CPU doesn't
+  adapt to human-skill mechanics/traits the way a real human naturally would. Sky is
+  built for human-vs-human/online play; it's expected to underperform specifically
+  against CPU opponents, and that's noted directly in its roster.js comment so it isn't
+  mistaken for an unnoticed bug later.

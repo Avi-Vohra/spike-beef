@@ -32,14 +32,18 @@ function setPointReaction(players, groundSide) {
 // just looks wrong). `p.slot` is each player's position in the flat
 // `players` array (0..teamSize*2-1), used to index per-tick inputs
 // independent of `side` (which two slots share a side, for team touches).
-export function createInitialState(seed = 1, teamSize = 1) {
+// `traitsBySlot` (optional) is an array of character traits (see
+// roster.js) indexed by slot — a chosen character for that player; any
+// slot left undefined gets the default (no-change) traits.
+export function createInitialState(seed = 1, teamSize = 1, traitsBySlot = null) {
   const match = createMatchState(0);
   const players = [];
   let slot = 0;
   for (let side = 0; side < 2; side++) {
     for (let i = 0; i < teamSize; i++) {
       const xOffset = teamSize === 1 ? 0 : (i === 0 ? -50 : 50);
-      players.push(createPlayer(side, slot, xOffset));
+      const traits = traitsBySlot && traitsBySlot[slot];
+      players.push(traits ? createPlayer(side, slot, xOffset, traits) : createPlayer(side, slot, xOffset));
       slot++;
     }
   }
@@ -92,7 +96,10 @@ export function step(state, inputP1OrArray, inputP2) {
       const wasSetWon = next.match.phase === 'setWon';
       startServe(next.match);
       next.ball = serveBallFor(next.match.server);
-      next.players = next.players.map((p) => createPlayer(p.side, p.slot, p.xOffset));
+      // .traits must be carried forward — without it, a chosen character
+      // would silently reset to default stats at the start of every new
+      // point (createPlayer defaults traits when not passed).
+      next.players = next.players.map((p) => createPlayer(p.side, p.slot, p.xOffset, p.traits));
       events.push({ type: wasSetWon ? 'nextSetReady' : 'nextServeReady' });
     }
     return { state: next, events };

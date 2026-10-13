@@ -5,6 +5,7 @@
 import { createInitialState, step } from '../src/sim.js';
 import { isMatchWon } from '../src/rules.js';
 import { aiInput, DIFFICULTIES } from '../src/ai.js';
+import { CHARACTERS, DEFAULT_TRAITS } from '../src/roster.js';
 import { fail } from './helpers.mjs';
 
 export function run() {
@@ -113,6 +114,39 @@ export function run() {
         ticks++;
       }
       if (ticks >= 60 * 60 * 12) fail(`difficulty ${difficulty} match did not complete`);
+    }
+  }
+
+  // Test 9: character roster balance guard. Each character's win rate vs a
+  // neutral baseline was tuned by direct measurement (see roster.js's
+  // comment) — power deltas especially are wildly high-leverage (a pure
+  // +15% power character went 20/20 against baseline before being tuned
+  // down). This guards against a future constant change (e.g. retuning
+  // MAX_CHARGE_POWER) silently re-breaking that balance without anyone
+  // noticing. Sky is excluded — it's a documented, accepted exception
+  // (underperforms specifically against the CPU's non-trait-aware jump
+  // timing; see roster.js) rather than something this guards.
+  {
+    function winRate(traitsA, traitsB, trials) {
+      let wins = 0;
+      for (let seed = 1; seed <= trials; seed++) {
+        let state = createInitialState(seed, 1, [traitsA, traitsB]);
+        let ticks = 0;
+        while (isMatchWon(state.match.sets) === -1 && ticks < 60 * 60 * 12) {
+          state = step(state, aiInput(state, 0, 'medium'), aiInput(state, 1, 'medium')).state;
+          ticks++;
+        }
+        if (state.match.sets[0] > state.match.sets[1]) wins++;
+      }
+      return wins;
+    }
+    const TRIALS = 20;
+    for (const char of CHARACTERS) {
+      if (char.id === 'sky') continue; // documented exception, see above
+      const wins = winRate(char.traits, DEFAULT_TRAITS, TRIALS);
+      if (wins <= 2 || wins >= TRIALS - 2) {
+        fail(`roster balance: ${char.name} vs baseline won ${wins}/${TRIALS} — too lopsided (expected roughly even)`);
+      }
     }
   }
 }
