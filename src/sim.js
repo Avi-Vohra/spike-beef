@@ -1,6 +1,6 @@
 import {
-  WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS,
-  createPlayer, stepPlayer, updateCharge, resolvePlayerHit,
+  WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS, TOSS_VY,
+  createPlayer, stepPlayer, updateCharge, resolvePlayerHit, capServeTrajectory,
 } from './physics.js';
 import { createBall, stepBallGravity, resolveBallBounds, resolveGround } from './ball.js';
 import { updateDive } from './dive.js';
@@ -89,31 +89,69 @@ export function step(state, inputP1, inputP2) {
     for (const p of next.players) stepPlayer(p, inputs[p.side], DT / SUBSTEPS);
   }
 
-  if (next.match.phase === 'serve') {
+  if (next.match.phase === 'serve' && !next.match.serveTossed) {
     const server = next.players[next.match.server];
     const dir = next.match.server === 0 ? 1 : -1;
-    next.ball.x = server.x + dir * 40;
-    next.ball.y = server.y - 150;
-    next.ball.vx = 0;
-    next.ball.vy = 0;
-
     next.match.serveTimer += DT;
     const autoServe = next.match.serveTimer >= AUTO_SERVE_SECONDS;
-    // Charged serve: hold HIT to charge like any other hit, release to serve
-    // — more charge = a faster, flatter serve. Vertical speed stays fixed
-    // regardless of charge (proven safe across the whole horizontal range
-    // below) so clearing the net is never in question, only how hot the
-    // serve comes in.
-    if (server.justReleased || autoServe) {
-      const charge = autoServe ? 0.5 : server.releaseCharge;
-      server.justReleased = false;
-      const vx = dir * (180 + charge * 140 + randomFloat(next) * 20);
-      next.ball.vx = vx;
+
+    if (autoServe) {
+      // No human engagement within the window — fall back to the old
+      // instant default serve so a match can never stall on input that
+      // isn't coming (and so a disconnected/idle CPU can't softlock it).
+      next.ball.x = server.x + dir * 40;
+      next.ball.y = server.y - 150;
+      next.ball.vx = dir * (180 + 0.5 * 140 + randomFloat(next) * 20);
       next.ball.vy = -500;
       registerTouch(next.match, next.match.server);
-      events.push({ type: 'serve', side: next.match.server, charge });
+      events.push({ type: 'serve', side: next.match.server, charge: 0.5 });
+      return { state: next, events };
     }
-    return { state: next, events };
+
+    if (server.charging) {
+      // TOSS-SERVE: the moment HIT is pressed, the ball leaves the
+      // server's hand and becomes a normal free-falling ball — NOTE this
+      // deliberately does NOT change match.phase yet (stays 'serve' until
+      // actual contact resolves below), so registerTouch's existing
+      // phase==='serve' first-contact special case still applies (doesn't
+      // count toward rallyHits, so ace detection — "point ended with 0
+      // rally hits" — still works correctly for a well-placed serve).
+      // Charging keeps building while it's in the air; releasing resolves
+      // the actual contact via the normal charged-hit pipeline below
+      // (tip/hit/spike by charge level, exactly like a rally touch) —
+      // timing the release against the falling toss IS the skill, not a
+      // single button press.
+      // dir*18 (not the old glued-serve's dir*40 — that offset was only
+      // ever a visual "ball floats beside your body" position, never
+      // collision-relevant, since the old model resolved contact instantly
+      // on button press). Now the ball has to physically fall back into
+      // PLAYER_RADIUS+BALL_RADIUS=38px of the server: at the lowest point
+      // it can reach before faulting (12px above ground — any lower and
+      // resolveGround fires first), a 40px horizontal offset put it at
+      // ~41.8px away, JUST outside reach — confirmed by tracing a held
+      // toss landing untouched by only 3.8px. 18px leaves real margin
+      // (~21px at that same lowest point).
+      next.ball.x = server.x + dir * 18;
+      next.ball.y = server.y - 150;
+      // Straight up, no horizontal drift: even a small sideways nudge here
+      // compounds over the ~1s flight and carries the ball out of a
+      // stationary server's reach entirely (the player's collision circle
+      // is centered at their feet, so it only reaches a narrow x range) —
+      // confirmed directly by tracing a continuously-held toss landing
+      // untouched 70px away from the server who never moved. A real toss
+      // comes straight back down to where you tossed it from.
+      next.ball.vx = 0;
+      next.ball.vy = TOSS_VY;
+      next.match.serveTossed = true;
+      events.push({ type: 'toss', side: next.match.server });
+    } else {
+      // Still waiting for the toss — ball stays glued to the server.
+      next.ball.x = server.x + dir * 40;
+      next.ball.y = server.y - 150;
+      next.ball.vx = 0;
+      next.ball.vy = 0;
+      return { state: next, events };
+    }
   }
 
   // Only one player can actually touch the ball first in a given tick.
@@ -141,6 +179,12 @@ export function step(state, inputP1, inputP2) {
         const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.side], events);
         if (hit) {
           ballTouchedThisTick = true;
+          // This is the server's own contact on their toss (phase is still
+          // 'serve' — see the toss-serve comment above) — re-shape the
+          // resulting velocity into a returnable serve envelope before
+          // committing it. Must happen BEFORE registerTouch, which flips
+          // phase to 'rally' the moment it sees 'serve'.
+          if (next.match.phase === 'serve') capServeTrajectory(next.ball);
           const fault = registerTouch(next.match, p.side);
           if (fault) {
             const groundSide = p.side;

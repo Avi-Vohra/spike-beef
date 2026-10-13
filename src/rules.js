@@ -17,6 +17,7 @@ export function createMatchState(firstServer) {
     lastToucherSide: null,
     serveTimer: 0,
     rallyHits: 0,
+    serveTossed: false, // toss-serve mechanic — see sim.js's 'serve' phase handling
   };
 }
 
@@ -72,6 +73,7 @@ export function startServe(match) {
   match.lastToucherSide = null;
   match.serveTimer = 0;
   match.rallyHits = 0;
+  match.serveTossed = false;
 }
 
 // Called whenever a player touches the ball during a rally.

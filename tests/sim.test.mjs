@@ -119,21 +119,36 @@ export function run() {
     if (p2.charging || p2.charge !== 0) fail('mistimed contact mid-charge should cancel the charge, not carry it forward');
   }
 
-  // Test 6c: charged serve — a longer hold before release produces a faster
-  // serve than an immediate tap-release, and both still clear the net (no
-  // NaN/stuck ball) regardless of how long it was held.
+  // Test 6c: toss-serve — pressing HIT tosses the ball into the air and
+  // hands off to the normal charge-and-release pipeline for the server's
+  // OWN contact once it falls back. Releasing too early (long before the
+  // ball actually returns) wastes the charge — RELEASE_GRACE_SECONDS
+  // expires before contact, so it resolves as a weak passive touch, same
+  // as any other mistimed release elsewhere in the game. Releasing right
+  // before the ball falls back into reach (release still within the grace
+  // window of actual contact) produces a real charged hit. Either way, the
+  // server's own contact must NOT count toward rallyHits (ace detection —
+  // "point ended with 0 rally hits" — depends on this).
   {
-    function serveSpeed(holdTicks) {
+    function serveOutcome(releaseAtTick) {
       let state = createInitialState(1);
-      for (let i = 0; i < holdTicks; i++) state = step(state, HIT, 0).state;
-      const result = step(state, 0, 0); // release
-      return { vx: Math.abs(result.state.ball.vx), events: result.events };
+      for (let i = 0; i < releaseAtTick; i++) state = step(state, HIT, 0).state; // toss + hold/charge
+      state = step(state, 0, 0).state; // release
+      let contactEvent = null;
+      for (let i = 0; i < 180 && !contactEvent; i++) {
+        const result = step(state, 0, 0);
+        state = result.state;
+        contactEvent = result.events.find((e) => ['hit', 'spike', 'tip', 'fumble', 'touch'].includes(e.type));
+      }
+      if (!contactEvent) fail(`serve toss released at tick ${releaseAtTick} never resolved a contact within budget`);
+      return { type: contactEvent.type, vx: Math.abs(state.ball.vx), rallyHits: state.match.rallyHits };
     }
-    const weak = serveSpeed(1);
-    const strong = serveSpeed(30);
-    if (strong.vx <= weak.vx) fail(`a longer-held serve should be faster: weak=${weak.vx} strong=${strong.vx}`);
-    if (!weak.events.some((e) => e.type === 'serve')) fail('releasing after a short hold should still serve');
-    if (!strong.events.some((e) => e.type === 'serve')) fail('releasing after a long hold should still serve');
+    const tooEarly = serveOutcome(5); // way before the ~72-tick fall-back — grace expires
+    const wellTimed = serveOutcome(70); // right before the ball actually returns
+    if (tooEarly.type !== 'touch') fail(`releasing long before the ball falls back should waste the charge (weak touch), got '${tooEarly.type}'`);
+    if (!['hit', 'spike'].includes(wellTimed.type)) fail(`releasing right before contact should produce a real charged hit, got '${wellTimed.type}'`);
+    if (wellTimed.vx <= tooEarly.vx) fail(`a well-timed serve release should be faster than a wasted one: early=${tooEarly.vx} timed=${wellTimed.vx}`);
+    if (tooEarly.rallyHits !== 0 || wellTimed.rallyHits !== 0) fail('the server\'s own toss-contact should never count toward rallyHits (ace detection depends on this)');
   }
 
   // Test 6c-net: a hit from very close to the net must actually be able to

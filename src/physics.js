@@ -49,6 +49,27 @@ export const HIT_COOLDOWN = 0.18;
 // almost every real-world release was silently wasting its whole charge.
 export const RELEASE_GRACE_SECONDS = 0.15;
 
+// Toss-serve: pressing HIT during the 'serve' phase tosses the ball off the
+// server's hand into the air (instead of an instant button-press serve),
+// handing off to the normal charge-and-release/contact pipeline — a
+// deliberate two-beat "toss, then time your hit" gesture, distinct from
+// every other hit in the game (which all start from an already-live ball).
+export const TOSS_VY = -620;
+// A serve contact reuses the normal charge-and-release hit pipeline (for
+// the timing skill), but that pipeline's hit/spike trajectories are flat
+// and fast — tuned for RALLY exchanges where the receiver already has
+// time to be in position. Reused unmodified for a serve, this was
+// measurably unreturnable: a 200-match CPU-vs-CPU harness produced a
+// literal 200/200 result, every single point a same-serve ace, because the
+// served ball was both faster (up to ~620px/s horizontal, vs the old
+// fixed-arc serve's ~340 max) AND flatter (less hang time) than the
+// receiver could react to. These constants re-shape a serve contact's
+// resulting velocity back into a returnable envelope afterward, in
+// sim.js, while still preserving the timing skill (a wasted/early release
+// is still weak; a well-timed one is still the strongest legal serve).
+export const SERVE_MAX_SPEED = 560; // close to the old model's ~600 peak speed
+export const SERVE_MIN_ARC_RATIO = 1.1; // |vy| >= |vx| * this — keeps real hang time
+
 export const TIP_POWER = 300;
 export const MIN_CHARGE_POWER = 360;
 export const MAX_CHARGE_POWER = 620;
@@ -118,6 +139,32 @@ function ensureClearsNet(ball) {
     const vyMin = (requiredY - ball.y - 0.5 * GRAVITY * t * t) / t;
     ball.vy = Math.max(NET_CLEARANCE_MAX_VY, Math.min(ball.vy, vyMin));
   }
+}
+
+// Re-shapes a just-resolved serve contact's velocity back into a returnable
+// envelope — see the comment on SERVE_MAX_SPEED/SERVE_MIN_ARC_RATIO above
+// for why this exists. Preserves direction (sign of vx, overall "which way
+// and how hard") while capping total speed and guaranteeing real hang
+// time, then re-checks net clearance since rescaling can change it.
+export function capServeTrajectory(ball) {
+  // Arc ratio FIRST, speed cap LAST — enforcing the ratio can only grow
+  // |vy|, so capping speed afterward (a uniform scale, which preserves
+  // whatever ratio was just established) is what actually guarantees the
+  // final speed stays under the cap. Doing it in the other order lets the
+  // ratio step push speed back over the cap it just satisfied — caught by
+  // direct measurement (an ace rate that was still ~49% after a first,
+  // wrongly-ordered attempt at this same fix).
+  const minAbsVy = Math.abs(ball.vx) * SERVE_MIN_ARC_RATIO;
+  if (Math.abs(ball.vy) < minAbsVy) {
+    ball.vy = ball.vy < 0 ? -minAbsVy : minAbsVy;
+  }
+  const speed = Math.hypot(ball.vx, ball.vy);
+  if (speed > SERVE_MAX_SPEED) {
+    const scale = SERVE_MAX_SPEED / speed;
+    ball.vx *= scale;
+    ball.vy *= scale;
+  }
+  ensureClearsNet(ball);
 }
 
 export function createPlayer(side) {

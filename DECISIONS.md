@@ -697,3 +697,61 @@ each) is within collision range (minDist=38) of BOTH players simultaneously.
   that was quietly affecting typical rallies, but a genuine correctness bug for the kind
   of tight net-crowding play two competitive humans (the current focus) are likely to
   produce more often than the CPU, which doesn't deliberately camp the net boundary.
+
+## New serve mechanic: toss-serve (explicit user request: "separate mechanic for serves")
+Replaced the instant charge-and-release serve (hold HIT, release, ball launches immediately
+from a glued position) with a toss-serve: pressing HIT tosses the ball off the server's
+hand into a real free-falling arc; the server then has to time their RELEASE against the
+ball actually falling back into reach, same charge-and-release pipeline as every other
+hit (tip/hit/spike by charge level), but as a genuine two-beat gesture instead of one
+button press. `match.serveTossed` tracks the transition; phase deliberately stays 'serve'
+(not 'rally') through the whole toss flight, only flipping once real contact resolves —
+this matters because `registerTouch`'s existing phase==='serve' special case is what
+keeps the server's own contact from counting toward `rallyHits`, which ace detection
+depends on (confirmed by testing: without this, ACE call-outs would never fire again).
+- **Three real bugs found and fixed while building this, each caught by actually running
+  it, not by review**:
+  1. **Toss drifted out of reach**: gave the toss a small `dir*30` horizontal nudge (felt
+     natural on paper) — over the ~1.1s flight this compounds into real drift, and traced
+     a continuously-held toss landing completely untouched 70px from a server who never
+     moved. Fixed: zero horizontal velocity on toss, straight up and straight back down.
+  2. **Toss origin just outside reach even with zero drift**: the serve's `dir*40`
+     horizontal offset from the server (purely a visual "ball floats beside your body"
+     position under the old instant-serve model, never collision-relevant before) put the
+     ball ~41.8px away at its lowest reachable height — just outside the 38px
+     (PLAYER_RADIUS+BALL_RADIUS) collision radius. Reduced to `dir*18`, leaving real
+     margin. Found by tracing exact ball/player distance tick-by-tick, not by guessing.
+  3. **Serve was unreturnable — 200/200 in the stress harness, literally every point an
+     instant ace**: the server's own contact reuses the normal hit/spike trajectory
+     shapes, which are flat and fast — tuned for mid-rally exchanges where the receiver
+     already has time to be in position, not a cold-open serve. A well-timed release hit
+     ~620px/s horizontal, far faster AND flatter (less hang time) than the old fixed-arc
+     serve's ~340px/s max. Added `capServeTrajectory` (SERVE_MAX_SPEED=560,
+     SERVE_MIN_ARC_RATIO=1.1) to re-shape the server's own contact back into a returnable
+     envelope, applied only when `match.phase==='serve'` at the moment of contact (before
+     `registerTouch` flips it). **Sub-bug caught on the first attempt**: ordered the arc-
+     ratio enforcement BEFORE the speed cap, not after — enforcing the ratio can only grow
+     `|vy|`, so capping speed first and then raising `|vy|` pushed speed right back over
+     the cap (ace rate was still ~49% after this "fixed" version). Swapped the order
+     (ratio first, uniform speed-scale last, which preserves the ratio) — re-measured:
+     ace rate dropped from 49% to 0.6%, a sane number, not 0% (still possible) or 100%.
+- **Also had to fix the AI's serve logic**, which was written for the old instant model
+  ("hold until charge reaches a target, then release immediately"). Under the toss model
+  that releases almost right after the toss begins — 50+ ticks before the ball actually
+  falls back into reach — wasting RELEASE_GRACE_SECONDS entirely and resolving as a weak
+  passive touch instead of a real serve. Fixed: AI now just tosses immediately (press HIT)
+  then falls through to the SAME distance-based release logic it already uses for every
+  other incoming ball, since post-toss the ball genuinely is just a normal ball the AI
+  needs to react to. Removed the now-dead `serveCharge` profile field.
+- Rewrote the serve-related sim.test.mjs test (Test 6c) for the new model: confirms an
+  early release (long before the ball falls back) wastes the charge into a weak 'touch',
+  a well-timed release (just before actual contact) produces a real charged hit, and the
+  server's own contact never counts toward rallyHits either way. The old test checked
+  ball velocity one tick after an instant release — meaningless under a model where
+  contact only resolves once the tossed ball actually falls back, sometimes 70+ ticks
+  later.
+- Net effect, measured over 40 CPU-vs-CPU matches: ace rate 0.6% (sane), average rally
+  length 3.47 (down from the pre-redesign 4.84 baseline — a believable consequence of
+  serving now being a real timing skill rather than a free near-max-power opener, not
+  something chased further given this session's standing policy on not over-tuning
+  CPU-vs-CPU aggregate stats).

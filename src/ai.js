@@ -38,9 +38,9 @@ export const DIFFICULTIES = ['easy', 'medium', 'hard'];
 // as timing precision, not an arbitrary "power" number, so a weak CPU looks
 // like it's mistiming its swing rather than just hitting a soft-coded cap.
 const PROFILES = {
-  easy: { deadzone: 60, predictiveness: 0.35, jumpThreshold: 70, wantsSpike: false, releaseLead: 55, serveCharge: 0.25 },
-  medium: { deadzone: 25, predictiveness: 0.7, jumpThreshold: 45, wantsSpike: true, releaseLead: 26, serveCharge: 0.5 },
-  hard: { deadzone: 8, predictiveness: 0.95, jumpThreshold: 30, wantsSpike: true, releaseLead: 12, serveCharge: 0.85 },
+  easy: { deadzone: 60, predictiveness: 0.35, jumpThreshold: 70, wantsSpike: false, releaseLead: 55 },
+  medium: { deadzone: 25, predictiveness: 0.7, jumpThreshold: 45, wantsSpike: true, releaseLead: 26 },
+  hard: { deadzone: 8, predictiveness: 0.95, jumpThreshold: 30, wantsSpike: true, releaseLead: 12 },
 };
 
 const CONTACT_RADIUS = PLAYER_RADIUS + BALL_RADIUS;
@@ -51,10 +51,19 @@ export function aiInput(state, side, difficulty = 'medium') {
   const p = state.players[side];
   const ball = state.ball;
 
-  // Serve: hold HIT to charge up to this difficulty's target, then release
-  // — matches the charged-serve model instead of waiting for auto-serve.
-  if (state.match.phase === 'serve' && state.match.server === side) {
-    return p.charge < profile.serveCharge ? HIT : 0;
+  // Toss-serve: press HIT immediately to toss, then fall through to the
+  // SAME distance-based release logic used for every other incoming ball
+  // below — the old model ("hold until charge reaches a target, then
+  // release") doesn't work anymore now that releasing has to land within
+  // RELEASE_GRACE_SECONDS of the ball actually falling back into reach;
+  // releasing early (right after the toss, which is what the old target-
+  // charge logic would do almost immediately) wastes the grace window
+  // entirely and the AI's own contact resolves as a weak passive touch
+  // instead of a real serve. Confirmed directly by tracing: releasing 24
+  // ticks before the ball's ~74-tick fall-back produced a 'touch' (weak),
+  // releasing 4 ticks before produced a real 'hit' (charged).
+  if (state.match.phase === 'serve' && state.match.server === side && !state.match.serveTossed) {
+    return HIT;
   }
 
   let mask = 0;
