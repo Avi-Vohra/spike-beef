@@ -940,3 +940,17 @@ of the court. Fixed by adding `slot` to the dive event in sim.js (events only ca
 Online guests still get no sand-puff for a dive (unchanged, already-accepted gap — the
 host's snapshot only ever serializes bare event type strings, stripping side/slot same
 as every other event field), but the common offline/host case is now correct for 2v2.
+
+## Split netClearance.js out of physics.js (392 -> 324 lines)
+physics.js had grown to 392 lines across this session's serve/block mechanic work,
+meaningfully over the file-size guideline (unlike earlier small overages that were
+accepted rather than force a hasty split). Extracted `ensureClearsNet` and
+`capServeTrajectory` (plus their constants) into a new netClearance.js — a cohesive,
+self-contained unit with a single responsibility. This creates a circular import
+(netClearance.js imports NET_X/NET_TOP/etc from physics.js; physics.js imports
+ensureClearsNet back from netClearance.js) — verified this is safe here: both files only
+use the circularly-imported bindings inside function bodies (called later, after both
+modules finish their synchronous top-level evaluation), never at module top-level, which
+is exactly the case ES modules handle correctly. Confirmed via `node --check` on both
+files AND the full test suite, not just syntax-checked. physics.js now 324 lines, still
+a touch over 300 but not worth a further split; netClearance.js is 75 lines.

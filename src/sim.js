@@ -1,7 +1,8 @@
 import {
   WIDTH, GROUND_Y, NET_X, DT, SUBSTEPS, TOSS_VY,
-  createPlayer, stepPlayer, updateCharge, resolvePlayerHit, capServeTrajectory,
+  createPlayer, stepPlayer, updateCharge, resolvePlayerHit,
 } from './physics.js';
+import { capServeTrajectory } from './netClearance.js';
 import { createBall, stepBallGravity, resolveBallBounds, resolveGround } from './ball.js';
 import { updateDive } from './dive.js';
 import {
