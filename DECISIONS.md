@@ -827,3 +827,19 @@ online netcode extension are separate follow-up pieces.
   team play, not vs-CPU. Local dual-keyboard input collection, 4-player rendering, the
   2v2 menu option, and online netcode carrying 2 players per side are separate follow-up
   pieces, not yet done as of this commit.
+
+## 2v2 team mode, part 2: generalized rendering
+Fixed render.js, which was hardcoded for exactly 2 players: `const [p1, p2] = state.players`
+silently dropped any player past index 1 (an entire team in 2v2), and both
+`drawServeIndicator`/`drawTouchPips` indexed `state.players[match.server]`/
+`state.players[side]` directly — `match.server`/`side` are TEAM values (0/1), not
+array indices, once a side holds 2 players (side 1's players live at array indices
+2-3, not index 1). Replaced with a generic loop over all players (color/mood computed
+from each player's own `side`, not array position) and `.find(p => p.side === ...)`
+for the serve indicator and touch pips (which show above the first/lowest-slot
+teammate on that side — the match state tracks team touches, not which individual
+teammate last touched, so this is the closest available approximation). Emote bubbles
+are per-side (the taunt bar is one shared UI control, not per local player) and now
+show above each side's first teammate in 2v2. Verified 1v1 renders pixel-identical
+to before via screenshot — this was purely a generalization, not a visual change for
+the existing mode.

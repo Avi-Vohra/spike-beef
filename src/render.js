@@ -190,22 +190,40 @@ export function render(ctx, state, spin, timeSec = 0, emotes = null, banner = nu
   drawNet(ctx, netSway);
   drawLandingMarker(ctx, state.ball, state.match.phase);
 
-  const [p1, p2] = state.players;
+  // Loops over ALL players (2 for 1v1, 4 for 2v2) rather than destructuring
+  // exactly [p1, p2] — that used to silently drop any player past index 1,
+  // which in 2v2 is an entire team. Mood/color are per-player's own side,
+  // not per-array-position.
   const diff = (state.match.score ? state.match.score[0] - state.match.score[1] : 0);
-  const mood1 = diff >= 4 ? 'ahead' : diff <= -4 ? 'behind' : null;
-  const mood2 = diff <= -4 ? 'ahead' : diff >= 4 ? 'behind' : null;
-  drawPlayer(ctx, p1, PALETTE.p1, PALETTE.p1Dark, state.ball.x - p1.x, mood1);
-  drawPlayer(ctx, p2, PALETTE.p2, PALETTE.p2Dark, state.ball.x - p2.x, mood2);
+  for (const p of state.players) {
+    const [color, colorDark] = p.side === 0 ? [PALETTE.p1, PALETTE.p1Dark] : [PALETTE.p2, PALETTE.p2Dark];
+    const mood = (p.side === 0 ? diff >= 4 : diff <= -4) ? 'ahead' : (p.side === 0 ? diff <= -4 : diff >= 4) ? 'behind' : null;
+    drawPlayer(ctx, p, color, colorDark, state.ball.x - p.x, mood);
+  }
   if (state.match.phase === 'serve') {
-    drawServeIndicator(ctx, state.players[state.match.server], timeSec);
+    // .find(), not direct [match.server] indexing — in 2v2 `server` is a
+    // SIDE (0/1), not a player-array index, since a side now holds 2
+    // players. The lowest-slot teammate on that side is the one serving
+    // (see sim.js) — find() with array order (ascending slot) matches that.
+    const server = state.players.find((p) => p.side === state.match.server);
+    drawServeIndicator(ctx, server, timeSec);
   } else if (state.match.phase === 'rally' && state.match.lastToucherSide !== null) {
     const side = state.match.lastToucherSide;
-    drawTouchPips(ctx, state.players[side], state.match.touches[side]);
+    // Touch pips show above whichever teammate most recently touched it —
+    // approximated here as the first (lowest-slot) player on that side,
+    // since the match state doesn't track exactly which individual
+    // teammate last touched, only the team/side.
+    const toucher = state.players.find((p) => p.side === side);
+    drawTouchPips(ctx, toucher, state.match.touches[side]);
   }
   drawBall(ctx, state.ball, spin, ballSquash);
   if (emotes) {
-    drawEmoteBubble(ctx, p1, emotes[0]);
-    drawEmoteBubble(ctx, p2, emotes[1]);
+    // Emotes are per-SIDE (the taunt bar is one shared UI, not per local
+    // player) — shown above that side's first teammate in 2v2.
+    for (let side = 0; side < 2; side++) {
+      const firstTeammate = state.players.find((p) => p.side === side);
+      if (firstTeammate) drawEmoteBubble(ctx, firstTeammate, emotes[side]);
+    }
   }
   drawScore(ctx, state.match);
   drawBanner(ctx, banner);
