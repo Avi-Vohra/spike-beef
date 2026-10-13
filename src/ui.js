@@ -231,12 +231,14 @@ export function renderHowToPlay(root, { onBack }) {
   root.appendChild(panel);
 }
 
-export function renderMatchEnd(root, match, { onRematch, onMenu, stats, titles }) {
+export function renderMatchEnd(root, match, { onRematch, onMenu, stats, titles, teamSize = 1 }) {
   clear(root);
   const panel = document.createElement('div');
   panel.className = 'sb-panel';
   const winnerSide = match.sets[0] > match.sets[1] ? 0 : 1;
-  const winnerLabel = winnerSide === 0 ? 'P1' : 'P2';
+  // "P1 wins" reads fine for 1v1, but makes no sense for a team win — use
+  // the team color name instead once there's more than one player per side.
+  const winnerLabel = teamSize === 2 ? (winnerSide === 0 ? 'Red Team' : 'Blue Team') : (winnerSide === 0 ? 'P1' : 'P2');
   const title = document.createElement('h2');
   title.className = 'sb-title';
   title.textContent = `${winnerLabel} wins the match!`;

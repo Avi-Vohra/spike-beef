@@ -910,3 +910,11 @@ release) and block (hold HIT while jumping, timed near peak) mechanics. Verified
 since that phrasing reads more naturally for 2v2 (the underlying rule/count is identical
 for both modes — team touches already worked correctly with zero logic changes, as
 documented in the 2v2 part 1 entry above).
+
+## 2v2 polish: match-end screen team labels
+`renderMatchEnd` said "P1 wins the match!" regardless of mode — made no sense for a 2v2
+team win (neither "P1" nor "P2" refers to a specific real player anymore, since both
+sides now have two). Added a `teamSize` param: 2v2 shows "Red Team"/"Blue Team" (matching
+the actual on-court colors), 1v1 keeps the existing "P1"/"P2" wording. Threaded through
+from main.js's `onMatchEnd` using the same `onlineTeamSize` already tracked for the
+online flow (local/CPU matches are always 1v1, so default to that).

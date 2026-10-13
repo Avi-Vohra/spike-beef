@@ -206,6 +206,7 @@ function onMatchEnd() {
   renderMatchEnd(overlay, state.match, {
     stats: stats.get(),
     titles,
+    teamSize: wasOnline ? onlineTeamSize : 1,
     onRematch: () => {
       if (wasOnline) {
         rematchState.local = true;
