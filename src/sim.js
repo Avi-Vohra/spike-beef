@@ -14,22 +14,39 @@ const SET_PAUSE_SECONDS = 2.5;
 
 // Presentation-only reaction pose, held (frozen, since updateCharge doesn't
 // run during the point/set pause) until the next serve resets the players —
-// winner gets a little victory pose, loser slumps.
+// winner's WHOLE team gets a little victory pose, loser's whole team slumps
+// (in 1v1 that's just one player each, same as before).
 function setPointReaction(players, groundSide) {
   const winner = groundSide === 0 ? 1 : 0;
-  players[winner].lastEvent = 'win';
-  players[winner].lastEventTimer = 999;
-  players[groundSide].lastEvent = 'lose';
-  players[groundSide].lastEventTimer = 999;
+  for (const p of players) {
+    if (p.side === winner) { p.lastEvent = 'win'; p.lastEventTimer = 999; }
+    else if (p.side === groundSide) { p.lastEvent = 'lose'; p.lastEventTimer = 999; }
+  }
 }
 
-export function createInitialState(seed = 1) {
+// `teamSize` 1 = classic 1v1 (one player per side, unchanged from before).
+// `teamSize` 2 = 2v2 (two players per side, spread apart with a small
+// xOffset so they don't start stacked on the same spot — the engine has no
+// player-vs-player collision, so nothing breaks if they do overlap, it
+// just looks wrong). `p.slot` is each player's position in the flat
+// `players` array (0..teamSize*2-1), used to index per-tick inputs
+// independent of `side` (which two slots share a side, for team touches).
+export function createInitialState(seed = 1, teamSize = 1) {
   const match = createMatchState(0);
+  const players = [];
+  let slot = 0;
+  for (let side = 0; side < 2; side++) {
+    for (let i = 0; i < teamSize; i++) {
+      const xOffset = teamSize === 1 ? 0 : (i === 0 ? -50 : 50);
+      players.push(createPlayer(side, slot, xOffset));
+      slot++;
+    }
+  }
   return {
     tick: 0,
     rngSeed: seed >>> 0,
     ball: serveBallFor(match.server),
-    players: [createPlayer(0), createPlayer(1)],
+    players,
     match,
     pauseTimer: 0,
   };
@@ -46,14 +63,18 @@ function randomFloat(state) {
   return value;
 }
 
-// step(state, inputP1, inputP2) -> { state: newState, events: [...] }
-// Pure: never mutates the input state object; returns a new one.
-export function step(state, inputP1, inputP2) {
+// step(state, inputP1, inputP2) -> { state: newState, events: [...] } for
+// 1v1 (unchanged calling convention), OR step(state, inputsArray) for 2v2
+// (and 1v1 too, if you'd rather) where inputsArray[p.slot] is each
+// player's mask. Pure: never mutates the input state object, returns a new
+// one.
+export function step(state, inputP1OrArray, inputP2) {
+  const inputs = Array.isArray(inputP1OrArray) ? inputP1OrArray : [inputP1OrArray, inputP2];
   const next = {
     tick: state.tick + 1,
     rngSeed: state.rngSeed,
     ball: { ...state.ball },
-    players: [{ ...state.players[0] }, { ...state.players[1] }],
+    players: state.players.map((p) => ({ ...p })),
     match: {
       ...state.match,
       score: [...state.match.score],
@@ -63,7 +84,6 @@ export function step(state, inputP1, inputP2) {
     pauseTimer: state.pauseTimer,
   };
   const events = [];
-  const inputs = [inputP1, inputP2];
 
   if (next.match.phase === 'point' || next.match.phase === 'setWon') {
     next.pauseTimer -= DT;
@@ -71,8 +91,7 @@ export function step(state, inputP1, inputP2) {
       const wasSetWon = next.match.phase === 'setWon';
       startServe(next.match);
       next.ball = serveBallFor(next.match.server);
-      next.players[0] = createPlayer(0);
-      next.players[1] = createPlayer(1);
+      next.players = next.players.map((p) => createPlayer(p.side, p.slot, p.xOffset));
       events.push({ type: wasSetWon ? 'nextSetReady' : 'nextServeReady' });
     }
     return { state: next, events };
@@ -82,15 +101,19 @@ export function step(state, inputP1, inputP2) {
   }
 
   for (const p of next.players) {
-    updateCharge(p, inputs[p.side], DT);
-    if (updateDive(p, inputs[p.side], DT, next.ball)) events.push({ type: 'dive', side: p.side });
+    updateCharge(p, inputs[p.slot], DT);
+    if (updateDive(p, inputs[p.slot], DT, next.ball)) events.push({ type: 'dive', side: p.side });
   }
   for (let s = 0; s < SUBSTEPS; s++) {
-    for (const p of next.players) stepPlayer(p, inputs[p.side], DT / SUBSTEPS);
+    for (const p of next.players) stepPlayer(p, inputs[p.slot], DT / SUBSTEPS);
   }
 
   if (next.match.phase === 'serve' && !next.match.serveTossed) {
-    const server = next.players[next.match.server];
+    // In 2v2 the lowest-slot teammate on the serving side always serves —
+    // a deliberate simplification (no rotation between teammates), not an
+    // oversight. Real volleyball rotation is a bigger scope than this pass
+    // covers.
+    const server = next.players.find((p) => p.side === next.match.server);
     const dir = next.match.server === 0 ? 1 : -1;
     next.match.serveTimer += DT;
     const autoServe = next.match.serveTimer >= AUTO_SERVE_SECONDS;
@@ -176,7 +199,7 @@ export function step(state, inputP1, inputP2) {
 
     if (!ballTouchedThisTick) {
       for (const p of next.players) {
-        const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.side], events);
+        const hit = resolvePlayerHit(next.ball, prevX, prevY, p, inputs[p.slot], events);
         if (hit) {
           ballTouchedThisTick = true;
           // This is the server's own contact on their toss (phase is still

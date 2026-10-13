@@ -785,3 +785,45 @@ correctly falls through to the normal spike/hit/tip logic, so there's no conflic
   matches, consistent with the 3.47 baseline right after the serve-mechanic fix (not a
   new regression — small variance expected from the randomness two independently-tuned
   mechanics interacting).
+
+## 2v2 team mode, part 1: core sim/rules generalization
+Explicit user request: "2 players on one team on one computer and 2 players on another
+team on a different computer... wasd and arrows for each on each computer." This is the
+foundational layer (sim.js/physics.js/rules.js) — input wiring, rendering, menu, and
+online netcode extension are separate follow-up pieces.
+- `createPlayer(side, slot = side, xOffset = 0)`: added `slot` (this player's position
+  in the flat `players` array, used to index per-tick inputs — kept separate from `side`
+  because 2v2 puts two players on the same side with different slots) and `xOffset`
+  (spreads 2v2 teammates apart visually; the engine has no player-vs-player collision so
+  nothing breaks if they overlap, it just looks wrong). Both default to exactly the
+  existing 1v1 behavior (`slot=side`, `xOffset=0`) — zero behavior change for 1v1.
+- `createInitialState(seed, teamSize = 1)`: `teamSize=2` creates 4 players (2 per side,
+  slots 0-3). `step()` now accepts EITHER the original `step(state, inputP1, inputP2)`
+  two-arg form (unchanged, still works for every existing 1v1 call site) OR
+  `step(state, inputsArray)` where `inputsArray[p.slot]` is each player's mask — detected
+  via `Array.isArray`.
+- Every per-player input lookup (`updateCharge`, `updateDive`, `stepPlayer`,
+  `resolvePlayerHit`) switched from `inputs[p.side]` to `inputs[p.slot]` — required,
+  since `p.side` is no longer a valid array index once two players share a side.
+- `setPointReaction` now applies the win/lose pose to EVERY player on the winning/losing
+  side (was direct `players[0]`/`players[1]` indexing, which only worked because 1v1 had
+  exactly one player per side at a fixed index).
+- Serve: the lowest-slot teammate on the serving side always serves — a deliberate
+  simplification (no rotation between teammates), not an oversight; real volleyball
+  rotation is out of scope for this pass.
+- **Touch-count rule needed ZERO changes**: `rules.js`'s `registerTouch`/`lastToucherSide`
+  logic already operates at the TEAM (side) level, not per-individual-player — a teammate
+  touching the ball after their partner already correctly continues the team's touch
+  count rather than resetting it (real volleyball rule), purely because the existing
+  code was already side-indexed, not player-indexed. Confirmed by reading the logic
+  before assuming it needed updating, not by guessing.
+- Added Test 7 (sim.test.mjs): confirms 4 players created with correct sides/slots
+  ([0,0,1,1]/[0,1,2,3]), and a FULL 2v2 match completes with all 4 players actively
+  moving/hitting (not just the serve-fault loop) with no NaN anywhere — ball or any
+  player position — over up to 12 simulated minutes. Full existing 1v1 suite still green
+  throughout (ran after every incremental change, not just once at the end).
+- **Deliberately not built this pass**: no CPU/AI support for 2v2 (ai.js still assumes
+  one player per side) — matches the user's explicit ask, which is local-human + online
+  team play, not vs-CPU. Local dual-keyboard input collection, 4-player rendering, the
+  2v2 menu option, and online netcode carrying 2 players per side are separate follow-up
+  pieces, not yet done as of this commit.

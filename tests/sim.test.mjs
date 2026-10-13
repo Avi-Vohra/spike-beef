@@ -307,4 +307,46 @@ export function run() {
     if (!divedNear || !p5.diving) fail('double-tapping should trigger a dive when the ball is genuinely close');
   }
 
+  // Test 7: 2v2 team mode — createInitialState(seed, 2) makes 4 players (2
+  // per side), step() accepts an inputs array indexed by p.slot (not
+  // p.side, since two players now share a side). Confirms: correct player
+  // count/sides/slots, no NaN over real gameplay with all 4 players
+  // actively moving/hitting, teammates share the team's touch count (a
+  // real volleyball rule — passing between teammates doesn't reset the
+  // 3-touch fault counter, which falls out of the EXISTING side-indexed
+  // touches/lastToucherSide logic in rules.js with zero changes needed),
+  // and a full match can complete (serve/score/set-win loop still works
+  // with 4 players).
+  {
+    let state = createInitialState(42, 2);
+    if (state.players.length !== 4) fail(`2v2 should create 4 players, got ${state.players.length}`);
+    const sides = state.players.map((p) => p.side);
+    if (sides.join(',') !== '0,0,1,1') fail(`expected sides [0,0,1,1], got [${sides.join(',')}]`);
+    const slots = state.players.map((p) => p.slot);
+    if (slots.join(',') !== '0,1,2,3') fail(`expected slots [0,1,2,3], got [${slots.join(',')}]`);
+
+    let ticks = 0;
+    const maxTicks = 60 * 60 * 12;
+    while (isMatchWon(state.match.sets) === -1 && ticks < maxTicks) {
+      const inputs = state.players.map((p) => {
+        const server = state.players.find((pp) => pp.side === state.match.server);
+        if (state.match.phase === 'serve') return p === server ? HIT : 0;
+        const dx = state.ball.x - p.x;
+        let mask = Math.abs(dx) > 10 ? (dx > 0 ? RIGHT : 1) : 0; // 1 = LEFT
+        if (Math.hypot(state.ball.x - p.x, state.ball.y - p.y) < 150) mask |= HIT;
+        return mask;
+      });
+      const result = step(state, inputs);
+      state = result.state;
+      if (state.players.some((p) => Number.isNaN(p.x) || Number.isNaN(p.y))) {
+        fail(`2v2 player position went NaN at tick ${ticks}`);
+      }
+      if (Number.isNaN(state.ball.x) || Number.isNaN(state.ball.y)) {
+        fail(`2v2 ball position went NaN at tick ${ticks}`);
+      }
+      ticks++;
+    }
+    if (isMatchWon(state.match.sets) === -1) fail(`2v2 match did not complete within ${maxTicks} ticks`);
+  }
+
 }

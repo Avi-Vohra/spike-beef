@@ -167,10 +167,18 @@ export function capServeTrajectory(ball) {
   ensureClearsNet(ball);
 }
 
-export function createPlayer(side) {
-  const x = side === 0 ? WIDTH * 0.25 : WIDTH * 0.75;
+// `slot` is this player's position in the full `state.players` array — used
+// to index the per-tick inputs array (`inputs[p.slot]`), kept separate from
+// `side` (which team/court-half they're on) because 2v2 puts two players on
+// the same side with different slots. Defaults to `slot = side`, exactly
+// matching 1v1's existing 2-player indexing — zero behavior change there.
+// `xOffset` spreads 2v2 teammates apart so they don't start stacked on the
+// exact same spot (the engine has no player-vs-player collision, so nothing
+// breaks if they overlap, but it looks wrong).
+export function createPlayer(side, slot = side, xOffset = 0) {
+  const x = (side === 0 ? WIDTH * 0.25 : WIDTH * 0.75) + xOffset;
   return {
-    side, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
+    side, slot, xOffset, x, y: GROUND_Y, vx: 0, vy: 0, onGround: true, hitCooldown: 0,
     charging: false, charge: 0, justReleased: false, releaseCharge: 0,
     releaseGraceTimer: 0,
     diving: false, diveTimer: 0, diveCooldownTimer: 0, diveDir: 0,
