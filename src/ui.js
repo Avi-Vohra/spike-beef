@@ -212,13 +212,15 @@ export function renderHowToPlay(root, { onBack }) {
   text.className = 'sb-text';
   text.innerHTML = [
     'P1: A/D move, W jump, S hit. P2: Arrow keys move, Up jump, Down hit.',
-    '<b>Hold HIT to charge, release to swing</b> — more charge = more power.',
+    '<b>Serve: press HIT to toss the ball up, time your release</b> as it falls back —',
+    'too early wastes it (weak touch), timed right = a real charged hit.',
+    '<b>Rally hits: hold HIT to charge, release to swing</b> — more charge = more power.',
     'Quick tap (barely any charge) = a soft tip.',
     'Jump + release a real charge near the top of your jump = a spike.',
     'Hold toward the net as you release = flatter, harder, riskier. Hold away = more arc, safer.',
-    'Jump into the ball right at the net without charging = a block.',
+    '<b>Block: hold HIT while jumping at the net</b>, timed near your jump\'s peak — mistime it and it\'s just a weak fumble.',
     'Double-tap a direction on the ground = a dive for a last-second save.',
-    '3 touches max per side. Ball on your sand = they score.',
+    '3 touches max per team. Ball on your sand = they score.',
     'First to 11, win by 2, cap 15. Best of 3 sets.',
   ].join('<br/>');
   const back = button('Back');

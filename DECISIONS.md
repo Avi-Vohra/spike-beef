@@ -899,3 +899,14 @@ the existing mode.
   cannot provide. The user should treat this the same way as any other online feature
   in this project: the logic is sound and tested as thoroughly as this environment
   allows, but a real two-phone/two-computer check is the way to confirm it fully.
+
+## Updated How-to-Play again for the new serve/block mechanics
+The in-game instructions had already been fixed once this session for the charge-model
+redesign, but this session's later toss-serve and active-block changes made it stale
+again (still said "hold HIT to serve" and "jump near the net without charging = block" —
+both no longer true). Rewrote to describe the actual current serve (toss, then time your
+release) and block (hold HIT while jumping, timed near peak) mechanics. Verified visually
+— fits the panel cleanly at 11 lines. Also changed "3 touches max per side" to "per team"
+since that phrasing reads more naturally for 2v2 (the underlying rule/count is identical
+for both modes — team touches already worked correctly with zero logic changes, as
+documented in the 2v2 part 1 entry above).
